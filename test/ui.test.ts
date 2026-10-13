@@ -73,3 +73,13 @@ describe('round 2B geometry and pack drop', () => {
     expect(d2.keys[d2.keys.length - 1].offset).toBe(1);
   });
 });
+
+describe('inspector layout', () => {
+  it('log-row grid rules never hit list items inside the inspector (.why / .ins-parts)', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const f of ['style', 'theme', 'gray', 'mobile', 'lite']) {
+      const css = readFileSync(`src/${f}.css`, 'utf8');
+      expect(css, f).not.toMatch(/\.plog li\b/);
+    }
+  });
+});

@@ -11,7 +11,7 @@
 /* readable body: pixel-ish body at 16px, mono for numbers, log, inspector and tooltips */
 body { font-size: 16px; line-height: 1.45; }
 .plog, .log-ins, .cc-stats, .tok, .sb-num, .jb-num, .tut-bubble, .tut, [role='tooltip'] { font-family: var(--mono); }
-.plog li, .log-ins, .log-ins p { font-family: var(--mono); font-size: 12.5px; line-height: 1.4; }
+.plog ol > li, .log-ins, .log-ins p { font-family: var(--mono); font-size: 12.5px; line-height: 1.4; }
 .small { font-size: 13.5px; } .dim { color: #a3adc6; }
 .tt-tag, .walkout b, .gl-title b { font-family: var(--px); }
 .tt-tag { letter-spacing: .12em; font-size: clamp(10px, 2vw, 13px); }

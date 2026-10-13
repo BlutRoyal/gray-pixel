@@ -728,11 +728,11 @@ td.hi { color: var(--mint); font-weight: 700; } td.lo { color: var(--red); font-
 .plog { background: rgba(0,0,0,.28); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; min-height: 0; }
 .plog .h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .1em; color: var(--dim); }
 .plog ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow-y: auto; }
-.plog li { display: grid; grid-template-columns: 28px 1fr; gap: 4px; font-size: 11.5px; line-height: 1.3; border-left: 2px solid var(--line2); padding-left: 5px; cursor: help; }
-.plog li.l0 { border-color: var(--mint); } .plog li.l1 { border-color: var(--orange); }
-.plog li .ln { color: var(--dim); font: 700 10px var(--mono); }
-.plog li small { display: none; color: var(--dim); font-size: 10.5px; } .plog li.new small, .plog li:hover small { display: block; }
-.plog li.k-sub { opacity: .85; font-style: italic; }
+.plog ol > li { display: grid; grid-template-columns: 28px 1fr; gap: 4px; font-size: 11.5px; line-height: 1.3; border-left: 2px solid var(--line2); padding-left: 5px; cursor: help; }
+.plog ol > li.l0 { border-color: var(--mint); } .plog ol > li.l1 { border-color: var(--orange); }
+.plog ol > li .ln { color: var(--dim); font: 700 10px var(--mono); }
+.plog ol > li small { display: none; color: var(--dim); font-size: 10.5px; } .plog ol > li.new small, .plog ol > li:hover small { display: block; }
+.plog ol > li.k-sub { opacity: .85; font-style: italic; }
 @media (min-width: 980px) { .plog ol { max-height: none; }   }
 /* cards */
 .hcard.r-iconic { --tc: var(--t-iconic); box-shadow: 0 0 0 1px var(--t-iconic), 0 0 14px rgba(255,79,216,.55); }

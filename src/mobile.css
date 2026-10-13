@@ -325,3 +325,24 @@ html.lite .overlay.sqscreen { background-color: #04050c; }
 @media (min-width: 640px) { .sum-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 740px; } }
 @media (max-height: 560px) and (orientation: landscape) { .sum-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 640px; gap: 6px; } .op-stage.sum { gap: 6px; } .op-stage.solo { gap: 4px; } .flip.solo { width: min(72vw, 330px, calc((100dvh - 120px) * 5 / 7)); } }
 @media (prefers-reduced-motion: reduce) { .flip.glitching .flip-in, .flip.glitching .back-logo { animation: none; } .sum-card { animation: none; } }
+
+/* ---------- portrait phones: the court keeps its full width and aspect; the controls scroll under a compact pinned top ---------- */
+@media (max-width: 999px) and (orientation: portrait) {
+  .xg { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; grid-template-rows: auto calc((100vw - 16px) / 1.12) auto auto; align-content: start; scrollbar-width: none; }
+  .xg::-webkit-scrollbar { display: none; } body.tut-dock .xg { grid-template-rows: auto calc((100vw - 16px) / 1.12) auto auto; }
+  .xg-hud { position: sticky; top: 0; z-index: 6; background: var(--bg, #05060f); padding-bottom: 2px; }
+  .xg > .court-box { container-type: inline-size; display: block; width: 100%; height: calc((100vw - 16px) / 1.12); flex: none; min-height: 0; }
+  .xg .court-wrap { width: 100cqw; }
+  .xg-act, .xg-hand { flex: none; }
+  /* defense panel: tighter tiles, shorter helper text */
+  .xg .shot-trio .shotbtn .sb-top { flex-wrap: wrap; gap: 0 4px; } .xg .shot-trio .shotbtn .sb-top b { font-size: 11px; line-height: 1.1; } .xg .shot-trio .shotbtn .sb-top em { font-size: 8.5px; }
+  .xg .shot-trio .shotbtn small { display: none; }
+  .xg .shot-trio .shotbtn { min-height: 46px; }
+  .mx-cap { display: none; }
+  .mx-row { gap: 4px; } .mx { padding: 2px; gap: 2px; }
+  .mx-o, .mx-d, .mx-dt { min-height: 34px; } .mx-o b, .mx-d b { font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 999px) {
+  .xg-act { overflow-y: auto; min-height: 0; scrollbar-width: none; } .xg-act::-webkit-scrollbar { display: none; }
+  .xg .shot-trio .shotbtn small, .mx-cap { display: none; } .mx-o, .mx-d, .mx-dt { min-height: 32px; }
+}
