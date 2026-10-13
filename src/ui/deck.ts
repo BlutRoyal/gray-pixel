@@ -6,7 +6,8 @@ import { allCards, ccard, classLabel, effectTag, isHard, isTrap, whenLabel, type
 import { cardTier } from '../casual/packs';
 import { LEVEL_MAX, cardLevelOf, cardNeed, cardShardsOf } from '../casual/progress';
 import { profile, save } from './store';
-import { esc } from './views';
+import { esc, playCardHTML } from './views';
+import { openInspect } from './inspect';
 
 type Sort = 'cost' | 'rarity' | 'name';
 let sortBy: Sort = 'rarity';
@@ -61,7 +62,7 @@ export function cardLevelInfo(c: CCard): { lv: number; text: string; pct: number
 function line(c: CCard, right: string, cls = ''): string {
   const t = cardTier(c), L = cardLevelInfo(c), tag = effectTag(c);
   return `<div class="dk-row t-${t} ${cls}"><span class="dk-cost" title="Momentum cost">${c.fx.allIn ? 'ALL' : c.cost}</span>
-    <span class="dk-name"><b>${esc(c.name)} <i class="dk-fx">${esc(tag.big)} ${esc(tag.small)}</i></b><small class="dim">${esc(TIER_NAME[t])} · ${esc(classLabel(c))} · ${esc(whenLabel(c))}${isHard(c) ? ' · hard counter' : ''}</small><small class="dk-text">${esc(c.text)}</small>
+    <span class="dk-name"><b>${esc(c.name)} <i class="dk-fx">${esc(tag.big)} ${esc(tag.small)}</i></b><small class="dim">${esc(TIER_NAME[t])} · ${esc(classLabel(c))} · ${esc(whenLabel(c))}${isHard(c) ? ' · hard counter' : ''}</small><small class="dk-text">${esc(c.text)}</small><button class="chipbtn dk-look" data-a="dklook" data-v="${c.k}" aria-label="Look at ${esc(c.name)} up close">Look</button>
     <span class="dk-lv"><span class="shbar" title="${esc(L.text)}"><i style="width:${L.pct}%"></i></span><small class="dim">${esc(L.text)}</small></span></span>${right}</div>`;
 }
 /** One flat tile of the deck strip. Tap removes it. */
@@ -107,6 +108,7 @@ export function deckAct(a: string, v: string | undefined): boolean {
   switch (a) {
     case 'dkadd': { const c = ccard(v!); let mine = current(coach); if (!mine.length) mine = myDeck(coach).slice(); if (c && canAdd(mine, c) && mine.filter((d) => d.k === c.k).length < copiesOwned(c)) { setDeck(coach, [...mine, c]); onChange(); } return true; }
     case 'dkrm': { let mine = current(coach); if (!mine.length) mine = myDeck(coach).slice(); const i = mine.findIndex((c) => c.k === v); if (i >= 0) { mine.splice(i, 1); setDeck(coach, mine); onChange(); } return true; }
+    case 'dklook': { const list = pool(coach); openInspect(list.map((c) => ({ html: playCardHTML(c.k, {}), info: `${TIER_NAME[cardTier(c)]} · ${cardLevelInfo(c).text}` })), Math.max(0, list.findIndex((c) => c.k === v))); return true; }
     case 'dkclear': setDeck(coach, []); onChange(); return true;
     case 'dkauto': setDeck(coach, buildDeck(ownedPlay(), coach)); onChange(); return true;
     case 'dksort': sortBy = v as Sort; onChange(); return true;

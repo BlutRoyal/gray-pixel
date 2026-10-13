@@ -96,6 +96,26 @@ if (want('specials')) {
   console.log('coach win rates: ' + CLS_KEYS.map((k) => `${k} ${pc(w[k].w, w[k].g)}`).join(' · '));
   console.log(`specials used in ${pc(used, sides)} of ${sides} Iconic appearances (${f1(used / games)} per game); by type: ${Object.entries(byType).map(([k, v]) => `${k} ${v}`).join(' ')}`);
 }
+// Iconic lift: the same squad with the Iconic in the fifth slot against that squad with a random Legendary there (mirror coach and deck, sides alternate).
+// npx tsx tools/csim.ts 40 iconic ; compare BDL_TUNE='{"icPassive":1}' (old: passive + special) with the default (special only).
+if (want('iconic')) {
+  seedRng(777);
+  const legs = ballersOfTier('legendary'), byT: Record<string, { w: number; g: number }> = {}, byH = { h: { w: 0, g: 0 }, n: { w: 0, g: 0 } };
+  let W = 0, Gm = 0;
+  for (const c of CLS_KEYS) for (let i = 0; i < N * 4; i++) {
+    const base = bandTeam(0.4, 0.7, c).slice(0, 4), holo = rnd() < 0.2;
+    const ic = cBaller(iconics[Math.floor(rnd() * iconics.length)], null, 1, holo), lg = cBaller(legs[Math.floor(rnd() * legs.length)], null, 1, false);
+    const mk = (x: ReturnType<typeof cBaller>) => newSide(c, [...base.map((b) => cBaller(b.id, b.sneakerId)), x], cpuDeck(c, 0.5));
+    const flip = i % 2 === 1, A = mk(ic), B = mk(lg);
+    const G = flip ? simGame(B, A, [mid, mid]) : simGame(A, B, [mid, mid]);
+    const won = (G.winner === 0) !== flip;
+    Gm++; if (won) W++;
+    const t = ic.special!.type; (byT[t] ||= { w: 0, g: 0 }).g++; if (won) byT[t].w++;
+    const h = holo ? byH.h : byH.n; h.g++; if (won) h.w++;
+  }
+  console.log(`\nIconic lift (passive ${T.icPassive ? 'ON' : 'OFF'}, spScale ${T.spScale}, off ${T.spOff} def ${T.spDef} util ${T.spUtil}): ${pc(W, Gm)} win rate of the squad with the Iconic (n=${Gm}); normal ${pc(byH.n.w, byH.n.g)} · HOLO ${pc(byH.h.w, byH.h.g)}`);
+  console.log('by special type: ' + Object.entries(byT).sort().map(([k, v]) => `${k} ${pc(v.w, v.g)}`).join(' · '));
+}
 const win: Record<string, { w: number; g: number }> = {};
 if (want('coach')) {
 for (const a of CLS_KEYS) win[a] = { w: 0, g: 0 };

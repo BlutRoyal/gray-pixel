@@ -168,7 +168,12 @@ tr.mvp td.pts b { color: #ffb000; } td.pts b { font-size: 14px; }
 @media (min-width: 900px) { .bx-all { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; align-items: start; } .bx-all .bx-mvp, .bx-all .bx-note { grid-column: 1 / -1; } }
 
 /* ================= pack opening round 4: suspense, shared Epic+ hint, glitch teases, pile, foil ================= */
-.flip.h-epicplus { --tc: #ffe08a; }
+@property --epx { syntax: '<color>'; inherits: true; initial-value: #b06cff; }
+@keyframes epalt { from { --epx: var(--t-epic); } to { --epx: var(--t-legendary); } }
+/* Epic and Legendary, face down: the same slow back-and-forth between the two tier colours for both */
+.flip.h-epicplus { --tc: var(--epx); }
+.flip.h-epicplus .flip-in, .flip.h-epicplus .hint-sparks { animation: epalt 1.1s ease-in-out infinite alternate; }
+html.lite .flip.h-epicplus .flip-in, html.lite .flip.h-epicplus .hint-sparks { animation: epalt 1.1s ease-in-out infinite alternate !important; }
 .flip.solo .flip-in { transition: transform var(--flipms) cubic-bezier(.25, .9, .25, 1.15), scale .14s ease-out; }
 html.lite .flip.solo .flip-in { transition: transform .3s, scale .14s !important; }
 .flip.solo.beat .flip-in { scale: 1.045; }
@@ -365,3 +370,27 @@ html.lite .pile-card { box-shadow: none; } html.lite .pile-card.fresh { animatio
 .flip.solo.flipping.glitching .front { animation: hgfxt .4s steps(1) infinite; }
 @keyframes hgfxt { 0%, 100% { translate: 0 0; } 20% { translate: -4px 0; } 40% { translate: 5px 1px; } 70% { translate: -3px -1px; } }
 .walkout b { font-size: clamp(36px, 11.5vw, 140px); }
+
+/* ---- close-up card view (pack pile and summary, Collection, Deck) ---- */
+.overlay.insp { z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(3, 4, 12, .94); touch-action: pan-y; }
+.insp-x { position: absolute; top: 10px; right: 10px; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line, #3a4470); background: rgba(10, 14, 30, .85); color: #fff; font: 700 26px/1 system-ui, sans-serif; cursor: pointer; z-index: 3; }
+.insp-row { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+.insp-card { position: relative; flex: 0 1 auto; width: min(82vw, 420px, calc((100dvh - 200px) * 5 / 7)); aspect-ratio: 5 / 7; }
+.insp-scale { position: absolute; left: 0; top: 0; width: 300px; height: 420px; transform: scale(var(--k, 1)); transform-origin: 0 0; }
+.insp-scale > .card { position: absolute; inset: 0; }
+.insp-card .csp { display: block; }
+.insp-card .cnt, .insp-card .newb { display: none; }
+.insp-nav { flex: 0 0 auto; width: 40px; height: 64px; border-radius: 10px; border: 1px solid var(--line, #3a4470); background: rgba(10, 14, 30, .7); color: #fff; font: 700 28px/1 system-ui, sans-serif; cursor: pointer; }
+.insp-nav[hidden] { display: none; }
+.insp-info { margin: 0; font: 700 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--amber, #ffb000); text-align: center; min-height: 1.4em; padding: 0 12px; }
+.insp-count { margin: 0; font: 600 11px var(--mono); color: var(--dim, #8e9bbd); text-align: center; }
+.insp-card .foilfx { display: block; }
+@media (max-width: 520px) { .insp-nav { width: 32px; } .insp-row { gap: 2px; } .insp-card { width: min(78vw, 420px, calc((100dvh - 200px) * 5 / 7)); } }
+.sum-card .card, .pile-card .card, .card-grid .card { cursor: zoom-in; }
+.dk-look { margin-top: 4px; min-height: 32px; }
+html.lite .insp-x, html.lite .insp-nav { background: #0b0f22; }
+
+/* cards: the art keeps a minimum share so the text never squeezes it away; text is fitted by fitCards() */
+.card.bcard .cart { min-height: 24%; }
+.card .csp, .card .ctrait { overflow-wrap: anywhere; }
+.pile-card .ctrait.csp { display: none; }

@@ -11,7 +11,7 @@ import { glideFrames, packTease, preFlip, turnClass } from './reveal';
 import { labOpen } from './gate';
 import { PACK_LINES } from './lore';
 import { strayHTML } from './wordmark';
-import { ballerCardHTML, bindTilt, esc, playCardHTML, reduced, sneakerCardHTML } from './views';
+import { ballerCardHTML, bindTilt, esc, fitCards, playCardHTML, reduced, sneakerCardHTML } from './views';
 import { levelOf } from '../casual/progress';
 
 let onChange: () => void = () => {};
@@ -19,10 +19,10 @@ export function initPacks(changed: () => void): void {
   onChange = changed;
   document.addEventListener('keydown', (e) => {
     if (!OP || OP.mode !== 'card' || (e.target as HTMLElement | null)?.closest('button')) return;
-    // keyboard: the same two steps as the mouse. Flip the face-down card, then NEXT CARD.
-    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); if (OP.auto) return; if (OP.step === 'wait') flip(); else if (OP.step === 'shown') next(); }
+    // keyboard: the same as a tap (skip ahead), or SEE SUMMARY once the last card is up.
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); if (OP.final) showSummary(); else tap(); }
   });
-  (window as unknown as { __gpOpen?: unknown }).__gpOpen = (specs: ForcedPull[], auto = false): boolean => { if (!labOpen()) return false; openForced(specs, auto); return true; };
+  (window as unknown as { __gpOpen?: unknown }).__gpOpen = (specs: ForcedPull[]): boolean => { if (!labOpen()) return false; openForced(specs); return true; };
   window.setInterval(() => { const el = document.getElementById('dailyT'); if (el) el.textContent = dailyTimer(); }, 30000);
 }
 /** Time until the free daily pack unlocks again (local midnight), e.g. "7h 12m". */
@@ -86,12 +86,13 @@ export function packsHTML(): string {
 }
 
 // ---------- opening ----------
-/** One card at a time. It glides in from the top face down and waits: nothing flips by itself (in the manual flow). A click starts the build-up
- *  (long and tense from Epic upward), then the turn; once flipped, clicking only tilts the card. NEXT CARD moves on. OPEN ALL does the same
- *  automatically and lays each opened card on a fanned pile. `step`: drop, wait (face down), build (suspense), flip (turning), shown (face up). */
+/** The opening runs by itself: the sealed pack teases, rips, then each card glides in face down, builds suspense (long from Epic up), turns and is
+ *  laid on a fanned pile; the LAST card stays up front (tilts on touch) until SEE SUMMARY. A tap skips ahead (during a build-up: to the flip; a second tap
+ *  on the same card: to the end), Skip all goes straight to the end. Tapping a pile or summary card opens the close-up view (inspect.ts).
+ *  `step`: drop (gliding in), wait (face down), build (suspense), flip (turning), shown (face up). */
 interface Opening {
   def: PackDef; pulls: Pull[]; isNew: boolean[]; i: number; mode: 'pack' | 'card' | 'sum'; step: 'drop' | 'wait' | 'build' | 'flip' | 'shown'; busy: boolean; shards: number; cardShards: number;
-  anim: Animation | null; timers: number[]; auto: boolean; pile: string[];
+  anim: Animation | null; timers: number[]; final: boolean; tapped: boolean; pile: string[];
 }
 let OP: Opening | null = null;
 export { preFlip, packTease, glideFrames };
@@ -126,7 +127,7 @@ function begin(def: PackDef, pulls: Pull[], pack = true): void {
   save();
   onChange();
   clearTimers();
-  OP = { def, pulls, isNew, i: 0, mode: 'pack', step: 'drop', busy: false, shards, cardShards, anim: null, timers: [], auto: false, pile: [] };
+  OP = { def, pulls, isNew, i: 0, mode: 'pack', step: 'drop', busy: false, shards, cardShards, anim: null, timers: [], final: false, tapped: false, pile: [] };
   if (pack) showPack();
 }
 function open(id: string, free: boolean, forceIconic = false): void {
@@ -140,12 +141,12 @@ function open(id: string, free: boolean, forceIconic = false): void {
   begin(def, openPack(def, { pity, forceIconic }));
 }
 /** Lab / test hook: opens a pack with exactly these pulls (window.__gpOpen, only when the Lab is unlocked). */
-export interface ForcedPull { kind?: 'baller' | 'sneaker' | 'play'; tier: Tier; holo?: boolean }
-export function openForced(specs: ForcedPull[], auto = false): void {
-  const pulls = specs.map((s) => { const p = pullOne(s.kind || (tierRank(s.tier) >= 3 ? 'baller' : 'play'), s.tier); p.holo = !!s.holo && s.tier === 'iconic' && p.kind === 'baller'; return p; });
+export interface ForcedPull { kind?: 'baller' | 'sneaker' | 'play'; tier: Tier; holo?: boolean; /** a specific Baller id */ id?: number }
+export function openForced(specs: ForcedPull[]): void {
+  const pulls = specs.map((s) => { const p = pullOne(s.kind || (tierRank(s.tier) >= 3 ? 'baller' : 'play'), s.tier); if (s.id != null && p.kind === 'baller') { p.id = s.id; p.key = 'b:' + s.id; }
+    p.holo = !!s.holo && s.tier === 'iconic' && p.kind === 'baller'; return p; });
   setMusicOverride(profile().music ? 'pack' : 'none');
   begin(packDef('pro'), pulls);
-  if (auto) rip(true);
 }
 function clearTimers(): void { if (OP) { OP.timers.forEach((t) => clearTimeout(t)); OP.timers = []; OP.anim?.cancel(); OP.anim = null; } }
 /** setTimeout that dies with the opening (a skip, a new pack, closing the overlay). */
@@ -180,24 +181,24 @@ function showPack(): void {
   if (holo) o.classList.add('holo-pack');
   o.innerHTML = `${holo ? '<span class="pk-static" aria-hidden="true"></span>' : ''}<div class="op-stage"><button class="pack-hit${cls}" data-a="rip" aria-label="Rip the pack open">${holo
     ? `<span class="gl-wrap">${art}<span class="gl-layer gl-a" aria-hidden="true">${art}</span><span class="gl-layer gl-b" aria-hidden="true">${art}</span></span>` : art}</button>
-    <p class="op-hint${holo ? ' gl-text' : ''}" data-text="${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}">${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}</p>
-    <button class="btn sm op-all" data-a="ripall">OPEN ALL</button></div>`;
+    <p class="op-hint${holo ? ' gl-text' : ''}" data-text="${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}">${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}</p><button class="btn sm op-skip-pack" data-a="opskip">Skip all</button></div>`;
   (o.querySelector('.pack-hit') as HTMLElement).focus();
+  // the pack opens itself after its tease; a tap on it rips at once
+  later(() => rip(), reduced() ? 100 : tease.kind === 'holo' ? 2600 : tease.kind === 'iconic' ? 1700 : tease.kind === 'epic+' ? 1400 : 800);
   if (!reduced()) {
     if (holo) { sfx('glitch2'); later(() => sfx('glitch3'), 420); later(() => sfx('glitch1'), 1500); }
     else if (tease.kind === 'iconic') sfx('glitch1', { v: 0.55 });
     else if (tease.kind === 'epic+') { sfx('heartbeat', { v: 0.7 }); later(() => sfx('heartbeat', { v: 0.7 }), 900); }
   }
 }
-function rip(auto = false): void {
+function rip(): void {
   const op = OP!;
   if (op.busy) return;
-  op.busy = true; op.auto = auto;
+  op.busy = true;
   const o = overlayEl(), tease = packTease(op.pulls), key = tease.best.replace('+', 'plus'), rank = preFlip(bestPull(op)).sfxRank;
   const btn = o.querySelector('.pack-hit') as HTMLElement;
   // the tear flashes in the colour of the best card inside; Epic and Legendary share one colour
   btn.classList.add('ripping', 'best-' + key);
-  o.querySelector('.op-all')?.remove();
   if (tease.kind === 'holo') o.classList.add('tear');
   const wait = liteOn() ? Math.round(tease.ripMs * 0.6) : tease.ripMs;
   if (!reduced()) {
@@ -213,16 +214,15 @@ function rip(auto = false): void {
 const bestPull = (op: Opening): Pull => op.pulls.reduce((m, p) => (preFlip(p).sfxRank + (p.holo ? 0.5 : 0) > preFlip(m).sfxRank + (m.holo ? 0.5 : 0) ? p : m), op.pulls[0]);
 function stageHTML(op: Opening): string {
   const i = op.i, p = op.pulls[i], n = op.pulls.length, pre = preFlip(p);
-  const piles = op.auto ? `<div class="op-pile" id="opPile" aria-hidden="true">${op.pile.join('')}</div>` : '';
-  return `<div class="op-stage solo${op.auto ? ' auto' : ''}">
+  return `<div class="op-stage solo auto">
     <div class="op-top"><span class="op-count">Card <b>${i + 1}</b> of ${n}</span><span class="op-dots" aria-hidden="true">${op.pulls.map((_x, k) => `<i class="${k < i ? 'done' : k === i ? 'now' : ''}"></i>`).join('')}</span><button class="btn sm" data-a="opskip">Skip all</button></div>
-    <div class="op-slot"><div class="flip solo ${pre.cls}${pre.faceGlitch === 2 ? ' glitching' : ''}" id="opCard" ${op.auto ? '' : 'data-a="opflip" '}role="button" tabindex="0" style="--hint:${pre.glow};--flipms:${pre.turnMs}ms;--bms:${pre.buildMs}ms;--sh:${pre.shake}" aria-label="Card ${i + 1} of ${n}, face down.${op.auto ? '' : ' Tap to flip.'}">
+    <div class="op-slot"><div class="flip solo ${pre.cls}${pre.faceGlitch === 2 ? ' glitching' : ''}" id="opCard" data-a="optap" role="button" tabindex="0" style="--hint:${pre.glow};--flipms:${pre.turnMs}ms;--bms:${pre.buildMs}ms;--sh:${pre.shake}" aria-label="Card ${i + 1} of ${n}, face down. Tap to skip ahead.">
       <span class="hint-sparks" aria-hidden="true">${hintSparks(p)}</span>
       <span class="flip-in"><span class="back"><span class="back-logo">G${strayHTML('back-stray')}</span><span class="back-ring"></span><span class="back-tear"></span><span class="back-leak"></span></span><span class="front">${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</span></span>${p.holo ? FOIL : ''}</div></div>
-    <p class="op-hint" id="opHint">&nbsp;</p>${piles}
-    <button class="btn op-next" id="opNextBtn" data-a="opnext" disabled>${op.auto ? 'Opening...' : 'Tap the card to flip'}</button></div>`;
+    <p class="op-hint" id="opHint">&nbsp;</p><div class="op-pile" id="opPile">${op.pile.join('')}</div>
+    <button class="btn op-next" id="opNextBtn" data-a="opnext" disabled>Opening...</button></div>`;
 }
-/** The big bottom button: disabled (a quiet prompt) until the card is face up, then a glowing NEXT CARD. */
+/** The big bottom button: a quiet "Opening..." until the last card is up, then a glowing SEE SUMMARY. */
 function nextBtn(label: string, ready: boolean): void {
   const b = document.getElementById('opNextBtn') as HTMLButtonElement | null;
   if (!b) return;
@@ -233,21 +233,22 @@ function nextBtn(label: string, ready: boolean): void {
 function showCards(): void { OP!.i = 0; OP!.mode = 'card'; dealCard(); }
 function dealCard(): void {
   const op = OP!, o = overlayEl();
-  op.mode = 'card'; op.step = 'drop'; op.busy = false;
+  op.mode = 'card'; op.step = 'drop'; op.busy = false; op.tapped = false;
   delete o.dataset.a;
   o.className = 'overlay opening';
   o.innerHTML = stageHTML(op);
   const el = o.querySelector<HTMLElement>('#opCard')!;
   const hint = o.querySelector('#opHint')!;
+  fitCards(o);
   if (reduced()) { land(); return; }
   const r = el.getBoundingClientRect();
   const { keys, dur, hit } = glideFrames(r.top + r.height + 30);
-  op.anim = el.animate(keys, { duration: op.auto ? dur + 220 : dur, fill: 'forwards' });
-  later(() => sfx('bounce', { power: 0.45 }), hit * (op.auto ? 1.28 : 1));
+  op.anim = el.animate(keys, { duration: dur + 220, fill: 'forwards' });
+  later(() => sfx('bounce', { power: 0.45 }), hit * 1.28);
   hint.textContent = 'Face down...';
-  later(land, op.auto ? dur + 220 : dur);
+  later(land, dur + 220);
 }
-/** The card has landed face down and WAITS. Its edge colour, glow and sparks hint at the tier (one shared hint for Epic and Legendary). In OPEN ALL it starts by itself. */
+/** The card has landed face down. Its edge colour, glow and sparks hint at the tier (Common/Uncommon/Rare: nothing; Epic and Legendary: one shared look). It starts by itself. */
 function land(): void {
   const op = OP!;
   if (op.step !== 'drop') return;
@@ -257,34 +258,28 @@ function land(): void {
   if (!el) return;
   el.classList.add('waiting');
   const hint = o.querySelector('#opHint');
-  if (hint) hint.textContent = op.auto ? 'Face down...' : 'Tap the card to flip it';
-  if (op.auto) later(flip, 650); else el.focus({ preventScroll: true });
+  if (hint) hint.textContent = 'Face down...';
+  later(flip, 650);
 }
-/** The click on the face-down card (or the automatic start in OPEN ALL): the suspense build-up first, then the turn. */
+/** The suspense build-up first (none for Common, Uncommon and Rare), then the turn. */
 function flip(): void {
   const op = OP;
-  if (!op || op.mode !== 'card') return;
-  if (op.step === 'drop') { if (op.auto) return; op.timers.forEach((t) => clearTimeout(t)); op.timers = []; land(); return; }
-  if (op.step !== 'wait') return;
+  if (!op || op.mode !== 'card' || op.step !== 'wait') return;
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
-  el.removeAttribute('data-a');
   el.classList.remove('waiting');
   const pre = preFlip(p), hint = o.querySelector('#opHint');
   if (pre.buildMs <= 0 || reduced()) { turn(); return; }
   op.step = 'build';
-  nextBtn(op.auto ? 'Opening...' : 'Building...', false);
   el.classList.add('building');
-  if (hint) hint.textContent = pre.key === 'rare' ? 'Something is compiling...' : 'Something huge is compiling...';
+  if (hint) hint.textContent = 'Something huge is compiling...';
   const ms = liteOn() ? Math.round(pre.buildMs * 0.8) : pre.buildMs;
   el.style.setProperty('--bms', ms + 'ms');
-  if (pre.heart) {
-    sfx('venitus', { ms, rank: pre.sfxRank, level: pre.faceGlitch === 2 ? 1 : 0 });
-    // heartbeat: faster and faster, each beat also pulses the card
-    let at = 450, gap = 820;
-    while (at < ms - 500) { const a = at; later(() => { sfx('heartbeat', { v: 0.95 }); el.classList.add('beat'); window.setTimeout(() => el.classList.remove('beat'), 150); }, a); at += gap; gap = Math.max(300, gap * 0.87); }
-    later(() => el.classList.add('flare'), ms - 380);
-  } else sfx('packCharge', { ms, rank: pre.sfxRank, i: op.i });
+  sfx('venitus', { ms, rank: pre.sfxRank, level: pre.faceGlitch === 2 ? 1 : 0 });
+  // heartbeat: faster and faster, each beat also pulses the card
+  let at = 450, gap = 820;
+  while (at < ms - 500) { const a = at; later(() => { sfx('heartbeat', { v: 1.15 }); el.classList.add('beat'); window.setTimeout(() => el.classList.remove('beat'), 150); }, a); at += gap; gap = Math.max(300, gap * 0.87); }
+  later(() => el.classList.add('flare'), ms - 380);
   later(turn, ms);
 }
 /** The turn itself: only now does the card show its real tier colour. HOLO glitches hard while it turns and wraps in foil at once. */
@@ -294,20 +289,18 @@ function turn(): void {
   op.step = 'flip';
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
-  const pre = preFlip(p), rank = tierRank(p.tier), ms = reduced() ? 0 : pre.turnMs;
-  el.removeAttribute('data-a');
-  el.classList.remove('waiting', 'building', 'flare', 'beat', 'h-epicplus');
+  const pre = preFlip(p), ms = reduced() ? 0 : pre.turnMs;
+  el.classList.remove('waiting', 'building', 'flare', 'beat', 'h-epicplus', 't-common');
   el.classList.add(turnClass(p.tier), 'flipping', 'flipped');
   el.style.setProperty('--flipms', ms + 'ms');
   if (p.holo) el.classList.add('foiling');
   if (!reduced()) {
-    if (pre.buildMs <= 0) sfx('packCharge', { ms, rank, i: op.i });
+    sfx('flipSlap', { rank: pre.sfxRank, v: pre.key === 'plain' ? 0.75 : 1 });
     if (isHoloIconic(p)) { el.classList.add('glitching'); sfx('glitch2'); }
     else if (p.tier === 'iconic') { el.classList.add('lglitch'); sfx('glitch1', { v: 0.7 }); }
   }
   const hint = o.querySelector('#opHint');
   if (hint) hint.textContent = pre.buildMs > 0 ? 'Compiling...' : '...';
-  nextBtn(op.auto ? 'Opening...' : 'Flipping...', false);
   later(reveal, ms);
 }
 function reveal(): void {
@@ -319,65 +312,83 @@ function reveal(): void {
   el.classList.remove('flipping', 'glitching');
   el.classList.add('shown');
   if (isHoloIconic(p) && !reduced()) { el.classList.add('hglitch'); later(() => el.classList.remove('hglitch'), 1400); }
-  el.setAttribute('aria-label', `${TIER_NAME[p.tier]}${p.holo ? ' HOLO' : ''} card.${op.auto ? '' : ' Tilts when touched. Use Next card to continue.'}`);
+  el.setAttribute('aria-label', `${TIER_NAME[p.tier]}${p.holo ? ' HOLO' : ''} card. Tilts when touched.`);
   const rank = tierRank(p.tier);
-  if (rank >= 1 || p.holo) burst(el, p.tier, isHoloIconic(p));
+  if (rank >= 3) burst(el, p.tier, isHoloIconic(p)); // Common, Uncommon and Rare: a clean flip, no burst or flash
   if (rank >= 4) rain(p.tier, isHoloIconic(p));
   const prevMax = op.pulls.slice(0, op.i).reduce((m, q) => Math.max(m, tierRank(q.tier)), -1);
-  const newBest = op.i > 0 && rank > prevMax && rank >= 2;
+  const newBest = op.i > 0 && rank > prevMax && rank >= 3;
   // a hit of its own per tier (Epic and Legendary only part ways here)
-  const hit = p.tier === 'epic' ? 'hitEpic' : p.tier === 'legendary' ? 'hitLegendary' : p.tier === 'iconic' ? 'iconicHit' : 'packReveal';
-  sfx(hit, { rank, i: op.i, newBest });
+  const hit = p.tier === 'epic' ? 'hitEpic' : p.tier === 'legendary' ? 'hitLegendary' : p.holo ? 'hitHolo' : p.tier === 'iconic' ? 'iconicHit' : 'packReveal';
+  sfx(hit, { rank: rank >= 3 ? rank : 0, i: op.i, newBest, v: rank >= 3 ? 1 : 0.8 });
   if (isHoloIconic(p)) setTimeout(() => sfx('glitch3'), 450);
   const last = op.i === op.pulls.length - 1;
   const hint = o.querySelector('#opHint');
   if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''}`;
   if (newBest && !reduced()) { el.classList.add('newbest'); later(() => el.classList.remove('newbest'), 1400); }
-  if (op.auto) {
-    nextBtn(last ? 'Laying it down...' : 'Opening...', false);
-    later(settle, (reduced() ? 400 : 1300) + rank * 220 + (p.holo ? 700 : 0));
+  if (last) {
+    // the last card stays up front (it tilts like any card) above the pile until SEE SUMMARY is tapped
+    op.final = true;
+    nextBtn('SEE SUMMARY', true);
     return;
   }
-  nextBtn(last ? 'SEE SUMMARY' : 'NEXT CARD', true);
+  nextBtn('Opening...', false);
+  later(settle, (reduced() ? 400 : 1300) + rank * 220 + (p.holo ? 700 : 0));
 }
-/** OPEN ALL: the opened card goes onto the fanned pile (slightly tilted and skewed), then the next one glides in. */
+/** The opened card goes onto the fanned pile (slightly tilted and skewed), then the next one glides in. */
+function pileHTML(op: Opening, k: number, fresh: boolean): string {
+  const p = op.pulls[k], wob = (a: number): number => Math.round(((k * 7919 + a * 104729) % 1000) / 1000 * 100) / 100;
+  const r = ((wob(1) - 0.5) * 12 + (k - (op.pulls.length - 1) / 2) * 4).toFixed(1), sk = ((wob(2) - 0.5) * 8).toFixed(1), y = Math.round((wob(3) - 0.3) * 14);
+  return `<div class="pile-card t-${p.tier}${p.holo ? ' foil-on' : ''}${fresh ? ' fresh' : ''}" style="--r:${r}deg;--k:${sk}deg;--y:${y}px">${faceHTML(p, op.isNew[k])}${p.holo ? FOIL : ''}</div>`;
+}
 function settle(): void {
   const op = OP;
-  if (!op || !op.auto || op.step !== 'shown') return;
-  const p = op.pulls[op.i], k = op.pile.length, wob = (a: number): number => Math.round(((k * 7919 + a * 104729) % 1000) / 1000 * 100) / 100;
-  const r = ((wob(1) - 0.5) * 12 + (k - (op.pulls.length - 1) / 2) * 4).toFixed(1), sk = ((wob(2) - 0.5) * 8).toFixed(1), y = Math.round((wob(3) - 0.3) * 14);
-  op.pile.push(`<div class="pile-card t-${p.tier}${p.holo ? ' foil-on' : ''} fresh" style="--r:${r}deg;--k:${sk}deg;--y:${y}px">${faceHTML(p, op.isNew[op.i])}${p.holo ? FOIL : ''}</div>`);
+  if (!op || op.step !== 'shown' || op.final) return;
+  op.pile.push(pileHTML(op, op.i, true));
   sfx('nextTick');
-  if (op.i >= op.pulls.length - 1) {
-    const o = overlayEl();
-    o.querySelector('#opCard')?.remove();
-    const pile = o.querySelector('#opPile');
-    if (pile) pile.innerHTML = op.pile.map((h, j) => (j === op.pile.length - 1 ? h : h.replace(' fresh', ''))).join('');
-    const hint = o.querySelector('#opHint'); if (hint) hint.textContent = 'All opened. Best pull: ' + TIER_NAME[bestPull(op).tier] + (bestPull(op).holo ? ' · HOLO' : '');
-    nextBtn('SEE SUMMARY', true);
-    op.auto = false;
-    return;
-  }
   op.i++;
   dealCard();
   op.pile = op.pile.map((h) => h.replace(' fresh', ''));
-  const pile = overlayEl().querySelector('#opPile');
-  if (pile) pile.lastElementChild?.classList.add('fresh');
 }
-/** The NEXT CARD button (only when the card is face up): the next card, or after the last one the summary. */
-function next(): void {
+/** A tap on the card: during the build-up it jumps to the flip, during the turn to the reveal, while it is shown to the next card; a second tap on the same card (or Skip all) goes to the end. */
+function tap(): void {
   const op = OP;
-  if (!op || op.mode !== 'card' || op.step !== 'shown' || (op.auto && op.i < op.pulls.length - 1)) return;
-  sfx('nextTick');
-  if (op.i >= op.pulls.length - 1) { showSummary(); return; }
+  if (!op || op.mode !== 'card' || op.final) return;
+  if (op.tapped) { skipToEnd(); return; }
+  op.tapped = true;
+  if (op.step === 'drop') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; land(); op.timers.forEach((t) => clearTimeout(t)); op.timers = []; flip(); }
+  else if (op.step === 'wait') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; flip(); }
+  else if (op.step === 'build') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; turn(); }
+  else if (op.step === 'flip') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; reveal(); }
+  else if (op.step === 'shown') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; settle(); }
+}
+/** Skip all: every earlier card is on the pile, the last one is up front and face up, SEE SUMMARY waits. */
+function skipToEnd(): void {
+  const op = OP;
+  if (!op || op.mode === 'sum') return;
   clearTimers();
-  op.i++;
-  dealCard();
+  op.mode = 'card';
+  op.i = op.pulls.length - 1;
+  op.pile = op.pulls.slice(0, -1).map((_p, k) => pileHTML(op, k, false));
+  const o = overlayEl();
+  op.step = 'drop'; op.tapped = false; op.final = false;
+  o.className = 'overlay opening';
+  o.innerHTML = stageHTML(op);
+  const el = o.querySelector<HTMLElement>('#opCard')!, p = op.pulls[op.i];
+  el.classList.remove('t-common', 'h-epicplus');
+  el.classList.add(turnClass(p.tier), 'flipped', 'shown');
+  if (p.holo) el.classList.add('foiling');
+  el.style.setProperty('--flipms', '0ms');
+  op.step = 'shown'; op.final = true;
+  const hint = o.querySelector('#opHint');
+  if (hint) hint.textContent = `${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''} · all opened`;
+  nextBtn('SEE SUMMARY', true);
+  fitCards(o);
 }
 function showSummary(): void {
   const op = OP!, o = overlayEl();
   clearTimers();
-  op.mode = 'sum'; op.auto = false;
+  op.mode = 'sum'; op.final = false;
   o.className = 'overlay opening';
   const ic = op.pulls.find((p) => p.tier === 'iconic'), holoIc = op.pulls.some(isHoloIconic);
   if (ic) { sfx('triumphHit', { rank: holoIc ? 1 : 0 }); setMusicOverride(profile().music ? 'triumph' : 'none', holoIc ? 1 : 0.55); }
@@ -395,6 +406,7 @@ function showSummary(): void {
     <p class="op-hint sum-note">${esc(PACK_LINES.done)} ${lines.map(esc).join(' ')}</p>
     <div class="row center"><button class="btn ghost" data-a="opclose">Done</button>${P.pending.length ? `<button class="btn go" data-a="openpending">Open next won pack (${P.pending.length})</button>` : ''}${P.bucks >= op.def.price ? `<button class="btn${P.pending.length ? '' : ' go'}" data-a="buy" data-v="${op.def.id}">Open another (${op.def.price})</button>` : ''}</div></div>`;
   o.scrollTop = 0;
+  fitCards(o);
 }
 /** Golden (or glitch-pink) particles falling from the top; skipped in lite mode and with reduced motion. */
 function rain(tier: Tier, holo = false): void {
@@ -450,11 +462,10 @@ export function packsAct(a: string, v: string | undefined): boolean {
     case 'buy': document.getElementById('opening')?.remove(); clearTimers(); buy(v!); return true;
     case 'openpending': document.getElementById('opening')?.remove(); clearTimers(); openPending(); return true;
     case 'rip': rip(); return true;
-    case 'ripall': rip(true); return true;
-    case 'opflip': flip(); return true;
+    case 'optap': tap(); return true;
     case 'claimdaily': if (claimDailyPack()) { document.getElementById('opening')?.remove(); clearTimers(); freePack('basic'); } return true;
-    case 'opnext': next(); return true;
-    case 'opskip': if (OP && OP.mode === 'card') showSummary(); return true;
+    case 'opnext': if (OP && OP.mode === 'card' && OP.final) showSummary(); return true;
+    case 'opskip': if (OP && OP.mode !== 'sum') skipToEnd(); return true;
     case 'opclose': document.getElementById('opening')?.remove(); clearTimers(); OP = null; setMusicOverride(null); onChange(); return true;
     case 'music': setMusic(!profile().music); if (OP) setMusicOverride(profile().music ? 'pack' : 'none'); onChange(); return true;
   }

@@ -85,7 +85,7 @@ export function ballerCardHTML(b: CBaller, c: CardCtx): string {
       <small class="dim">${esc(b.team)}${look ? ' · ' + esc(look) : ''}${c.mine ? '' : ' · opponent'}</small></div></div>
     <div class="bc-stats">${statCell('RIM', b.rim)}${statCell('MID', b.mid)}${statCell('THREE', b.three)}${statCell('DEF', b.def)}${statCell('PLY', b.ply)}</div>
     ${ch}
-    <div class="bc-skill"><b>${esc(b.skill.name)}</b><span>${esc(b.skill.text)}</span></div>
+    ${b.skill.key === 'none' ? '' : `<div class="bc-skill"><b>${esc(b.skill.name)}</b><span>${esc(b.skill.text)}</span></div>`}
     ${b.special && c.special ? specialBlockHTML(b, c.special) : ''}
     <div class="bc-rows">
       <div><em>Fatigue</em>${fatigueBar(b)}</div>

@@ -37,6 +37,15 @@ describe('audio settings persistence', () => {
   });
 });
 
+describe('default volumes', () => {
+  it('new players start clearly quieter than full', () => {
+    expect(DEFAULT_AUDIO.master).toBeLessThanOrEqual(0.5); expect(DEFAULT_AUDIO.sfx).toBeLessThanOrEqual(0.6); expect(DEFAULT_AUDIO.music).toBeLessThanOrEqual(0.4);
+  });
+  it('saved settings are kept as they are', () => {
+    expect(parseSettings('{"master":0.85,"sfx":1,"music":0.6,"mute":false}')).toEqual({ master: 0.85, sfx: 1, music: 0.6, mute: false });
+  });
+});
+
 describe('sound and music tables', () => {
   it('every sound has a recipe, a class and a positive trim', () => {
     const names = Object.keys(SOUNDS);
@@ -44,7 +53,7 @@ describe('sound and music tables', () => {
     for (const n of names) { const d = SOUNDS[n as keyof typeof SOUNDS]; expect(typeof d.fn).toBe('function'); expect(d.trim).toBeGreaterThan(0); expect(['ui', 'play', 'big']).toContain(d.cat); }
   });
   it('the key game events all have a sound', () => {
-    for (const n of ['tap', 'confirm', 'back', 'tab', 'cardSelect', 'cardPlay', 'trapSet', 'moTick', 'moSurge', 'shotRelease', 'swish', 'rim', 'backboard', 'dunk', 'layup', 'block', 'steal', 'turnover', 'andOne', 'roar', 'groan', 'fireOn', 'heartbeat', 'clutchRiser', 'glitch1', 'glitch2', 'glitch3', 'subSwap', 'coin', 'shard', 'levelUp', 'reward', 'packRip', 'packCharge', 'packReveal', 'iconicHit', 'nextTick', 'summary', 'boot']) expect(SOUNDS).toHaveProperty(n);
+    for (const n of ['tap', 'confirm', 'back', 'tab', 'cardSelect', 'cardPlay', 'trapSet', 'moTick', 'moSurge', 'shotRelease', 'swish', 'rim', 'backboard', 'dunk', 'layup', 'block', 'steal', 'turnover', 'andOne', 'roar', 'groan', 'fireOn', 'heartbeat', 'clutchRiser', 'glitch1', 'glitch2', 'glitch3', 'subSwap', 'coin', 'shard', 'levelUp', 'reward', 'packRip', 'packCharge', 'packReveal', 'iconicHit', 'flipSlap', 'venitus', 'hitEpic', 'hitLegendary', 'hitHolo', 'nextTick', 'summary', 'boot']) expect(SOUNDS).toHaveProperty(n);
   });
   it('tracks loop on whole bars at a sensible tempo', () => {
     for (const t of Object.values(TRACKS)) { expect(t.len % 16).toBe(0); expect(t.bpm).toBeGreaterThanOrEqual(60); expect(t.bpm).toBeLessThanOrEqual(100); }

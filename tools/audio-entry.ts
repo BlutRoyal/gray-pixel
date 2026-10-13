@@ -1,6 +1,6 @@
 // Browser-side half of the offline audio renderer (bundled by tools/audio-render.ts). Renders sounds and music loops with the
 // same recipes the game uses, through the same master chain, into stereo Float32 buffers.
-import { DEFAULT_AUDIO, effectiveGains } from '../src/ui/audioSettings';
+import { effectiveGains } from '../src/ui/audioSettings';
 import { SOUNDS, type SfxName, type SfxOpts } from '../src/ui/sounds';
 import { buildChain, voiceRig } from '../src/ui/synth';
 import { TRACKS, buildBuses, type TrackName } from '../src/ui/tracks';
@@ -11,7 +11,8 @@ function pack(buf: AudioBuffer): { sr: number; l: string; r: string } {
   const enc = (a: Float32Array): string => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
   return { sr: buf.sampleRate, l: enc(buf.getChannelData(0)), r: enc(buf.getChannelData(1)) };
 }
-const gains = effectiveGains(DEFAULT_AUDIO);
+// fixed reference volumes, so the level table does not move when the player-facing defaults change
+const gains = effectiveGains({ master: 0.85, sfx: 1, music: 0.6, mute: false });
 export async function renderSfx(name: SfxName, o: SfxOpts, lite = false, trim?: number): Promise<ReturnType<typeof pack>> {
   const probe = new OfflineAudioContext(2, SR, SR);
   const def = SOUNDS[name], tr = trim ?? def.trim;

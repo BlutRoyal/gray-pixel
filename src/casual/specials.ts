@@ -52,13 +52,13 @@ const RAW: [string, SpType, number, string][] = [
   ['Loop', 'loop', 3, 'Same possession, again. Nobody objects.'],
   ['Replay Buffer', 'loop', 5, 'He remembers how that went in.'],
   ['Infinite Loop', 'loop', 2, 'The ball does not come back. It never left.'],
-  ['Bonus Round', 'worth', 3, 'The scoreboard rounds up.'],
-  ['Jackpot Hit', 'worth', 5, 'Something pays out. Nobody asked what.'],
+  ['Bonus Round', 'worth', 5, 'The scoreboard rounds up.'],
+  ['Jackpot Hit', 'worth', 7, 'Something pays out. Nobody asked what.'],
   ['Hot Patch', 'ignite', 5, 'Patched live. It runs hot.'],
   ['Thermal Spike', 'ignite', 6, 'The sensors read a number the sensors cannot read.'],
   ['Burn-In', 'ignite', 4, 'An old image that never fades.'],
-  ['Firewall', 'firewall', 12, 'Nothing gets in. Nothing gets in his way.'],
-  ['Sandbox', 'firewall', 11, 'Traps and doubles run in a room he is not in.'],
+  ['Firewall', 'firewall', 22, 'Nothing gets in. Nothing gets in his way.'],
+  ['Sandbox', 'firewall', 20, 'Traps and doubles run in a room he is not in.'],
   // defense: their shot this possession
   ['Access Denied', 'stop', 28, 'Credentials rejected. Politely.'],
   ['Throttle', 'stop', 20, 'Their shot arrives slowly, and wrong.'],
@@ -80,12 +80,12 @@ const RAW: [string, SpType, number, string][] = [
   ['Freeze Frame', 'cool', 3, 'He is still standing there. He will be, a while.'],
   ['Memory Dump', 'drain', 6, 'Their Momentum is, briefly, his.'],
   ['Power Drain', 'drain', 7, 'The arena dims on their side.'],
-  ['Core Surge', 'surge', 6, 'The clock speed is not a number he agrees with.'],
-  ['Overdrive', 'surge', 8, 'Past the rated limit. Nothing complained.'],
+  ['Core Surge', 'surge', 10, 'The clock speed is not a number he agrees with.'],
+  ['Overdrive', 'surge', 12, 'Past the rated limit. Nothing complained.'],
   ['Cache Flush', 'flush', 0, 'Legs, cooldowns, old plays: cleared.'],
   ['Hot Swap', 'flush', 0, 'Replaced while running. Nobody noticed.'],
-  ['Cache Hit', 'draw', 3, 'The next play was already in memory.'],
-  ['Prefetch', 'draw', 3, 'He asked for the cards before the question.'],
+  ['Cache Hit', 'draw', 4, 'The next play was already in memory.'],
+  ['Prefetch', 'draw', 4, 'He asked for the cards before the question.'],
   ['Rewind', 'rewind', 1, 'That basket? It has not happened yet.'],
   ['Rollback', 'rewind', 2, 'Restored from the last good version.'],
   ['Undo', 'rewind', 1, 'Ctrl+Z. The crowd noticed.'],
@@ -126,24 +126,24 @@ const n1 = (x: number): string => String(Math.round(x * 10) / 10);
 export function specialText(sp: Special, holo = false): string {
   const v = spValue(sp, holo);
   switch (sp.type) {
-    case 'sure': return `His next shot is ${n1(v)}% if the defense does not guess his zone.`;
-    case 'skip': return `His next shot cannot be blocked and ignores the scheme. +${n1(v)}%.`;
-    case 'fork': return `Two shooters: if his shot misses, the best teammate shoots too (+${n1(v)}%).`;
-    case 'loop': return `If his shot goes in, you keep the ball. +${n1(v)}% on the shot.`;
-    case 'worth': return `His next basket is worth +1 point. +${n1(v)}% on the shot.`;
+    case 'sure': return `Next shot ${n1(v)}% unless they guess his zone.`;
+    case 'skip': return `Unblockable, ignores the scheme. +${n1(v)}%.`;
+    case 'fork': return `If he misses, your best teammate shoots too. +${n1(v)}%.`;
+    case 'loop': return `If it goes in, you keep the ball. +${n1(v)}%.`;
+    case 'worth': return `His next basket is worth +1. +${n1(v)}%.`;
     case 'ignite': return `He is On Fire now. +${n1(v)}% on this shot.`;
-    case 'firewall': return `Traps and the double team do nothing this possession. +${n1(v)}% on his shot.`;
+    case 'firewall': return `Traps and double teams do nothing. +${n1(v)}%.`;
     case 'stop': return `Their shot this possession loses ${n1(v)}%.`;
-    case 'trace': return `Their shot counts as read: it loses ${n1(v)}%, even if you guessed wrong.`;
-    case 'steal': return `${n1(v)}% chance they lose the ball before the shot.`;
-    case 'cap': return `Their shot this possession cannot be better than ${n1(v)}%.`;
-    case 'null': return `Removes all their face-down Traps and cancels the card they play this possession. +${v} Momentum.`;
+    case 'trace': return `Their shot is read: it loses ${n1(v)}% even on a wrong guess.`;
+    case 'steal': return `${n1(v)}% they lose the ball before the shot.`;
+    case 'cap': return `Their shot is capped at ${n1(v)}%.`;
+    case 'null': return `Clears their Traps and cancels their card. +${v} Momentum.`;
     case 'cool': return `Their best shooter cools for ${v} attacks.`;
     case 'drain': return `They lose ${v} Momentum, you gain ${Math.floor(v / 2)}.`;
     case 'surge': return `+${v} Momentum now.`;
-    case 'flush': return 'Your court Ballerz are fresh: fatigue and cooldowns cleared.';
-    case 'draw': return `Draw ${v} cards (up to a full hand), +1 Momentum, and your next card costs 1 less.`;
-    case 'rewind': return `Right after they score: cancel up to ${v} point${v === 1 ? '' : 's'} of that basket (all of it takes back its Momentum). You get the ball.`;
+    case 'flush': return 'Your court Ballerz are fresh (fatigue and cooldowns cleared). +3 Momentum.';
+    case 'draw': return `Draw ${v} cards, +1 Momentum, next card costs 1 less.`;
+    case 'rewind': return `After they score: cancel up to ${v} point${v === 1 ? '' : 's'} of it. You get the ball.`;
   }
 }
 /** Short label for the kind of moment it is used in. */

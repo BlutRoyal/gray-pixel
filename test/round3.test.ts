@@ -209,33 +209,34 @@ describe('packs', () => {
 });
 
 describe('opening flow constants and the daily pack', () => {
-  it('hints grow with rarity, builds are long from Epic up, and Epic and Legendary share one pre-flip descriptor', () => {
+  it('Common, Uncommon and Rare share one plain pre-flip look; Epic and Legendary share another; Iconic and HOLO differ', () => {
     const d = (tier: Tier, holo = false) => preFlip({ tier, holo });
-    const order: Tier[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'iconic'];
-    const sp = order.map((t) => d(t).sparks);
-    expect(sp).toEqual([...sp].sort((a, b) => a - b)); expect(sp[0]).toBe(0);
+    expect(d('uncommon')).toEqual(d('common')); expect(d('rare')).toEqual(d('common'));
+    expect(d('common')).toMatchObject({ glow: 0, sparks: 0, buildMs: 0, alt: false, heart: false, leak: false });
+    expect(d('common', true)).toEqual(d('common'));
     expect(d('epic')).toEqual(d('legendary'));
+    expect(d('epic').alt).toBe(true);
     expect(d('epic').buildMs).toBeGreaterThanOrEqual(3000);
-    expect(d('rare').buildMs).toBeLessThan(d('epic').buildMs);
-    expect(JSON.stringify(d('epic'))).not.toMatch(/epic$|legendary/i);
+    expect(d('epic')).not.toEqual(d('common'));
+    expect(JSON.stringify(d('epic'))).not.toMatch(/legendary/i);
     expect(d('iconic')).not.toEqual(d('epic')); expect(d('iconic').faceGlitch).toBe(1);
     expect(d('iconic', true).faceGlitch).toBe(2); expect(d('iconic', true).buildMs).toBeGreaterThan(d('iconic').buildMs);
-    expect(d('common', true)).toEqual(d('common'));
   });
   it('the sealed pack: HOLO glitches hard, a normal Iconic only flickers, Epic and Legendary give the same tease', () => {
     const P = (...x: [Tier, boolean?][]) => packTease(x.map(([tier, holo]) => ({ tier, holo: !!holo })));
     expect(P(['common'], ['rare'], ['iconic', true]).kind).toBe('holo');
     expect(P(['common'], ['iconic']).kind).toBe('iconic');
     expect(P(['epic'], ['rare'])).toEqual(P(['legendary'], ['rare']));
-    expect(P(['rare'], ['common']).kind).toBe('none');
+    expect(P(['rare'], ['common']).kind).toBe('none'); expect(P(['rare'])).toEqual(P(['common']));
     expect(P(['iconic', true]).ripMs).toBeGreaterThan(P(['iconic']).ripMs);
     expect(P(['iconic']).ripMs).toBeGreaterThan(P(['epic']).ripMs);
   });
-  it('the opening never flips a manual card by itself, only OPEN ALL does', () => {
+  it('the opening is automatic only: no manual flip or NEXT CARD flow, a tap or Skip all jumps ahead, the last card stays up front', () => {
     const src = readFileSync('src/ui/packs.ts', 'utf8');
-    expect(src).toMatch(/opflip/);
-    expect(src).not.toMatch(/setTimeout\([^)]*flip\(/);
-    expect(src).toMatch(/if \(op\.auto\) later\(flip/);
+    expect(src).not.toMatch(/opflip|ripall|OPEN ALL|NEXT CARD/);
+    expect(src).toMatch(/case 'optap'/); expect(src).toMatch(/case 'opskip'/);
+    expect(src).toMatch(/later\(flip, 650\)/);
+    expect(src).toMatch(/op\.final = true/);
   });
   it('the free pack can be taken once per local day', () => {
     S.resetProfile();

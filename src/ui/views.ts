@@ -95,7 +95,7 @@ export function ballerCardHTML(id: number, o: CardOpts = {}): string {
     <div class="cname"><b>Baller ${esc(c.name)}</b><small>${esc(c.team)}</small></div>
     <div class="cstats">${statCells(c, false)}</div>
     <div class="ctrait cgame-line"><span>${r.pos}</span><span>RIM <b>${r.rim}</b></span><span>MID <b>${r.mid}</b></span><span>3PT <b>${r.three}</b></span><span>DEF <b>${r.def}</b></span></div>
-    <div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))}</div>` : ''}`,
+    ${r.skill.key === 'none' ? '' : `<div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>`}${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))}</div>` : ''}`,
   `Baller ${c.name}, ${TIER_NAME[tier]}`);
 }
 
@@ -154,5 +154,18 @@ export function bindTilt(root: HTMLElement): void {
   root.addEventListener('pointerout', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tilt]');
     if (el && !el.contains(e.relatedTarget as Node)) { el.style.removeProperty('--rx'); el.style.removeProperty('--ry'); }
+  });
+}
+
+/** Makes sure every card's text fits inside it: the special text first shrinks (down to 7px), then the duplicate Rim/Mid/3PT line goes. The card art keeps a minimum share (CSS). Call after any render that has cards. */
+export function fitCards(root: ParentNode = document): void {
+  root.querySelectorAll<HTMLElement>('.card .cface').forEach((face) => {
+    const sp = face.querySelector<HTMLElement>('.csp');
+    if (!sp || face.clientHeight === 0 || sp.offsetParent === null) return;
+    sp.style.fontSize = '';
+    face.querySelector<HTMLElement>('.cgame-line')?.style.removeProperty('display');
+    let fs = parseFloat(getComputedStyle(sp).fontSize) || 10;
+    for (let k = 0; k < 14 && face.scrollHeight > face.clientHeight + 1 && fs > 7; k++) { fs -= 0.5; sp.style.fontSize = fs + 'px'; }
+    if (face.scrollHeight > face.clientHeight + 1) face.querySelector<HTMLElement>('.cgame-line')?.style.setProperty('display', 'none');
   });
 }

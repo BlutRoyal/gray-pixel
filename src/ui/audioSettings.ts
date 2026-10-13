@@ -2,7 +2,8 @@
 // Every storage access is guarded: storage can be missing or blocked and the game must still work.
 export interface AudioSettings { master: number; sfx: number; music: number; mute: boolean }
 export const AUDIO_KEY = 'gp_audio';
-export const DEFAULT_AUDIO: AudioSettings = { master: 0.85, sfx: 1, music: 0.6, mute: false };
+/** Defaults for NEW players only (saved settings are never touched). Raise or lower them here. */
+export const DEFAULT_AUDIO: AudioSettings = { master: 0.5, sfx: 0.6, music: 0.4, mute: false };
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 const store = (): Store | null => { try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; } };

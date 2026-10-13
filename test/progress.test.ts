@@ -35,7 +35,7 @@ describe('tiers by rank', () => {
     expect(cBaller(id).tier).toBe('legendary');
     expect(cBaller(id).skill.tier).toBe('legendary');
     expect(skillFor(5, 'G', 'uncommon').tier).toBe('generic');
-    expect(cBaller(ballersOfTier('iconic')[0]).skill.tier).toBe('iconic');
+    expect(cBaller(ballersOfTier('iconic')[0]).skill.key).toBe('none'); // an Iconic has only his special
   });
   it('Sneaker display tiers', () => {
     expect(sneakerRowTier([1, 80, 0, 4, 0, 0])).toBe('iconic');

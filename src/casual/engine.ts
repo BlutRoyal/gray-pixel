@@ -12,6 +12,8 @@ import { ENH, POS_NAME, SCHEME_NAME, ZONES, ZONE_NAME, ZONE_PTS, positionOf, sho
 
 export type { CCard } from './cards';
 export type { Zone, Pos, Skill, Shoe } from './skills';
+/** An Iconic has no passive skill: his special is the whole identity (see TUNING.icPassive). */
+export const NO_SKILL: Skill = { key: 'none', name: '', text: '', tier: 'generic', fx: {} };
 export type { Special, SpType } from './specials';
 export { ZONES, ZONE_NAME, ZONE_PTS, SCHEME_NAME } from './skills';
 export type Side = 0 | 1;
@@ -81,7 +83,7 @@ export function cBaller(id: number, sneakerId: number | null = null, level = 1, 
   const st = { D: b.st.D + up, P: b.st.P + up, S: b.st.S + up, F: b.st.F + up, J: sr ? sr[1] : NO_SNEAKER_J };
   const pos = positionOf(st), tier = ballerTier(id);
   return {
-    id, name: b.name, team: b.team, cls: classOf(st), st, sneakerId: sr ? sr[0] : null, shoe: shoeOf(sr), tier, level: lv, pos, skill: skillFor(id, pos, tier), holo: holo && tier === 'iconic', special: tier === 'iconic' ? specialFor(id) : null, spUsed: false,
+    id, name: b.name, team: b.team, cls: classOf(st), st, sneakerId: sr ? sr[0] : null, shoe: shoeOf(sr), tier, level: lv, pos, skill: tier === 'iconic' && !T.icPassive ? NO_SKILL : skillFor(id, pos, tier), holo: holo && tier === 'iconic', special: tier === 'iconic' ? specialFor(id) : null, spUsed: false,
     rim: st.D, mid: Math.round(st.S * 0.6 + st.P * 0.4), three: st.S, ply: st.P, def: st.F, run: 0, cd: 0, hold: 0, streak: 0,
   };
 }
@@ -886,7 +888,7 @@ export function useSpecial(G: CGame, s: Side, idx: number): boolean {
     }
     case 'drain': O.mo = Math.max(0, O.mo - v); S.mo = Math.min(T.moMax, S.mo + Math.floor(v / 2)); break;
     case 'surge': S.mo = Math.min(T.moMax, S.mo + v); break;
-    case 'flush': for (const x of S.team) { x.run = 0; x.hold = 0; } break;
+    case 'flush': for (const x of S.team) { x.run = 0; x.hold = 0; } S.mo = Math.min(T.moMax, S.mo + 3); break;
     case 'draw': draw(S, v); S.discount = true; S.mo = Math.min(T.moMax, S.mo + 1); break;
     case 'rewind': {
       // cancels up to v points of their last basket; only a fully cancelled basket takes its Momentum back

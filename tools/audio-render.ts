@@ -21,7 +21,7 @@ const MUSIC_TARGET: Record<string, number> = { pack: -20, game: -22, title: -26 
 const OPTS: Partial<Record<SfxName, SfxOpts[]>> = {
   moTick: [{ level: 0.3 }, { level: 0.9 }], roar: [{ level: 0.2 }, { level: 0.6 }, { level: 1 }],
   packCharge: [{ ms: 1000, rank: 1, i: 0 }, { ms: 1400, rank: 3, i: 2 }, { ms: 2200, rank: 5, i: 4 }],
-  packReveal: [0, 1, 2, 3, 4, 5].map((rank) => ({ rank, i: rank })), packRip: [{ rank: 0 }, { rank: 5 }], clutchRiser: [{ ms: 2400 }], bounce: [{ power: 0.3 }, { power: 1 }],
+  packReveal: [0, 1, 2, 3, 4, 5].map((rank) => ({ rank, i: rank })), packRip: [{ rank: 0 }, { rank: 5 }], flipSlap: [{ rank: 0, v: 0.75 }, { rank: 4 }, { rank: 5 }], venitus: [{ ms: 3400, rank: 4 }, { ms: 3800, rank: 5 }, { ms: 4200, rank: 5, level: 1 }], hitEpic: [{ rank: 3 }], hitLegendary: [{ rank: 4 }], hitHolo: [{}], clutchRiser: [{ ms: 2400 }], bounce: [{ power: 0.3 }, { power: 1 }],
 };
 interface Case { key: string; name: SfxName; o: SfxOpts; lite?: boolean }
 const cases: Case[] = [];

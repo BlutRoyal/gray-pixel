@@ -27,7 +27,7 @@ export const BOOT_LINES: string[] = [
 /** Pack screens: what opening a pack means in the Grid. */
 export const PACK_LINES = {
   shop: 'Packs are render queues. Pay in Bucks, and the Grid prints new Ballerz. Now and then it prints one with a stray pixel.',
-  ripHint: 'Tap the pack to start the render',
+  ripHint: 'The render starts by itself. Tap to hurry it.',
   ripIconic: 'Something rare is compiling inside. A gray pixel is out of place.',
   rendering: ['Rendering cards...', 'Compiling Ballerz...', 'Placing one pixel too many...'],
   done: 'Render complete. The cards are yours.',
