@@ -528,6 +528,7 @@ export function chance(G: CGame, s: Side, shooter: number, zone: Zone, c: ShotCt
   if (b.shoe) { add('Sneaker', b.shoe.bonus); if (zone === 'rim' || iso) add('Jump', b.shoe.jumpRim); }
   add(`Skill: ${b.skill.name}`, (fx.zone?.[zone] || 0) + (fx.all || 0));
   if (!open) { const dfx = dfn.skill.fx; add(`${dfn.name}: ${dfn.skill.name}`, -((dfx.stop?.[zone] || 0) + (dfx.stopAll || 0))); }
+  if (b.tier === 'iconic') add('Iconic +' + T.iconicBoost + '%', T.iconicBoost);
   add('Tired', -fatigueOf(b));
   if (!open) add(`${dfn.name} is tired`, fatigueOf(dfn) * 0.5);
   const passer = iso || fixed ? null : passerOf(S, shooter);

@@ -124,3 +124,9 @@ Everything is synthesized with Web Audio (no audio files). Feedback: the effects
 
 ## Iconic: special only
 An Iconic Baller has no passive skill any more (`NO_SKILL` in `engine.ts`; `TUNING.icPassive` = 1 brings the old passive back for comparison sims). His special is the whole identity, so specials were retuned up: `spOff` and `spDef` 2.2 (percent effects), `spUtil` 1, plus higher base numbers for Firewall, Sandbox, Core Surge, Overdrive, Cache Hit, Prefetch, Bonus Round and Jackpot Hit, and Cache Flush also gives +3 Momentum. Check with `npx tsx tools/csim.ts 250 iconic` (an Iconic in the fifth slot against a random Legendary, 6000 games) and `npx tsx tools/csim.ts 60 specials` (coach win rates). Result: old passive + special 58% lift, special only after the retune 54-55% (more magnitude does not help beyond this, because a special is used once per game and several numbers are capped); no special type above 60%; coach win rates 46-53%. Special text is short on purpose, and `fitCards()` in `views.ts` shrinks it (down to 7px) and drops the duplicate Rim/Mid/3PT line so it always fits the card, also in the close-up.
+
+## Round 5 notes
+
+- Ballerz branding: the official logo (`assets/ballerz-emblem.webp`, `assets/ballerz-logo-white.webp`, inlined by `src/ui/logo.ts`) is the title/splash hero emblem, the faint page backdrop, the top bar mark, the pack art and the favicon. Blue/red accents come from `--bz-blue` and `--bz-red` in `src/ballerz.css`.
+- Iconic Ballerz get a permanent `iconicBoost` (+2%, Lab-editable) on every shot, shown as the "Iconic +2%" row.
+- The sealed pack waits for one tap; card text is fitted to the frame by `fitCards`; `tools/cardaudit.mjs` (Playwright) checks for overflow.

@@ -1,4 +1,5 @@
 // Shared view pieces: escaping, images with pixel fallback, and the three card faces (Baller, Sneaker, Play).
+import { TUNING } from '../casual/tuning';
 import {
   CLASSES, ENH_NAME, ENH_SHOT, SHOTS, TIER_NAME, TRAITS, ballerRow, ballerTier, catalog, makeBaller, sneakerRow, sneakerRowTier,
   type BallerCard, type Tier,
@@ -95,7 +96,7 @@ export function ballerCardHTML(id: number, o: CardOpts = {}): string {
     <div class="cname"><b>Baller ${esc(c.name)}</b><small>${esc(c.team)}</small></div>
     <div class="cstats">${statCells(c, false)}</div>
     <div class="ctrait cgame-line"><span>${r.pos}</span><span>RIM <b>${r.rim}</b></span><span>MID <b>${r.mid}</b></span><span>3PT <b>${r.three}</b></span><span>DEF <b>${r.def}</b></span></div>
-    ${r.skill.key === 'none' ? '' : `<div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>`}${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))}</div>` : ''}`,
+    ${r.skill.key === 'none' ? '' : `<div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>`}${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))} <i class="ic-b">Iconic +${TUNING.iconicBoost}% all shots.</i></div>` : ''}`,
   `Baller ${c.name}, ${TIER_NAME[tier]}`);
 }
 
@@ -158,14 +159,34 @@ export function bindTilt(root: HTMLElement): void {
 }
 
 /** Makes sure every card's text fits inside it: the special text first shrinks (down to 7px), then the duplicate Rim/Mid/3PT line goes. The card art keeps a minimum share (CSS). Call after any render that has cards. */
+const FIT_TXT = '.ctrait, .csp, .ptext, .pflav, .ptype, .pname, .cname small';
+/** Fits every text block of every card inside its frame, at any card size: shrink the copy first (down to about 65%), then drop the
+ *  least important blocks one by one (flavour, game line, special text, trait text), and last of all clamp the effect text with an ellipsis. */
 export function fitCards(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('.card .cface').forEach((face) => {
-    const sp = face.querySelector<HTMLElement>('.csp');
-    if (!sp || face.clientHeight === 0 || sp.offsetParent === null) return;
-    sp.style.fontSize = '';
-    face.querySelector<HTMLElement>('.cgame-line')?.style.removeProperty('display');
-    let fs = parseFloat(getComputedStyle(sp).fontSize) || 10;
-    for (let k = 0; k < 14 && face.scrollHeight > face.clientHeight + 1 && fs > 7; k++) { fs -= 0.5; sp.style.fontSize = fs + 'px'; }
-    if (face.scrollHeight > face.clientHeight + 1) face.querySelector<HTMLElement>('.cgame-line')?.style.setProperty('display', 'none');
+    if (face.clientHeight === 0 || face.offsetParent === null) return;
+    const txt = Array.from(face.querySelectorAll<HTMLElement>(FIT_TXT));
+    const hideable = ['.pflav', '.cgame-line', '.csp', '.ctrait:not(.csp):not(.cgame-line)', '.ptype', '.cname small', '.cstats'];
+    hideable.forEach((q) => face.querySelectorAll<HTMLElement>(q).forEach((e) => e.style.removeProperty('display')));
+    txt.forEach((e) => { e.style.fontSize = ''; e.style.removeProperty('-webkit-line-clamp'); e.style.removeProperty('max-height'); });
+    const tops = Array.from(face.querySelectorAll<HTMLElement>('.ctop, .cname b, .cname small, .pname'));
+    tops.forEach((e) => { e.style.fontSize = ''; });
+    const over = (): boolean => face.scrollHeight > face.clientHeight + 1;
+    const base = txt.map((e) => parseFloat(getComputedStyle(e).fontSize) || 10);
+    const apply = (f: number): void => txt.forEach((e, k) => { e.style.fontSize = Math.max(6, base[k] * f).toFixed(2) + 'px'; });
+    let f = 1;
+    for (let k = 0; k < 12 && over() && f > 0.66; k++) { f -= 0.03; apply(f); }
+    for (const q of hideable) {
+      if (!over()) break;
+      face.querySelectorAll<HTMLElement>(q).forEach((e) => e.style.setProperty('display', 'none'));
+    }
+    if (over()) { // last resort: clamp the effect text with an ellipsis
+      const t = face.querySelector<HTMLElement>('.ptext, .ctrait');
+      if (t) { t.style.removeProperty('display'); t.style.display = '-webkit-box'; t.style.setProperty('-webkit-box-orient', 'vertical'); for (let n = 6; n >= 1 && over(); n--) t.style.setProperty('-webkit-line-clamp', String(n)); }
+    }
+    // tags and names must not spill sideways (or end in an ellipsis) on narrow cards: shrink them first
+    tops.forEach((e) => { let fs = parseFloat(getComputedStyle(e).fontSize) || 9; for (let k = 0; k < 8 && e.scrollWidth > e.clientWidth + 1 && fs > 5.5; k++) { fs -= 0.5; e.style.fontSize = fs + 'px'; } });
   });
 }
+let fitTimer = 0;
+if (typeof window !== 'undefined') window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = window.setTimeout(() => fitCards(document), 150); });

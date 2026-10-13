@@ -19,7 +19,7 @@ import { cardArt, isTrapCard } from './cardart';
 import { COURT_POS, DRIVE_END, DRIVE_START, HOOP, LOB, collapseSpots, contestSpot, dunks, formationFor, glitchLevel, lerpPt, shotOrigin, type Pt } from './geometry';
 import { badges, icon, mainIcon } from './icons';
 import { GAME_TAGLINE, GLITCH_LORE, MENU_LINES, TITLE_LINES, pick } from './lore';
-import { wordmarkSVG } from './wordmark';
+import { strayHTML, wordmarkSVG } from './wordmark';
 import { getAudio, sfx } from './sfx';
 import { speakerIcon } from './sound';
 import { setMusicOverride, setTension, spikeTension } from './music';
@@ -208,10 +208,8 @@ const autoDeckNote = (): string => (deckIsAuto(profile().coach as ClassKey) ? `<
 function courtBackdrop(): string {
   const lines = Array.from({ length: 9 }, (_x, i) => { const x = -400 + i * 150; return `<path d="M${x} 400 L${300 + (x - 300) * 0.18} 250"/>`; }).join('');
   const rows = [262, 276, 296, 324, 362].map((y) => `<path d="M${300 - (y - 250) * 4.2} ${y} H${300 + (y - 250) * 4.2}"/>`).join('');
-  return `<div class="tt-bd" aria-hidden="true"><svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMin meet" focusable="false">
+  return `<div class="tt-bd" aria-hidden="true"><div class="tt-emb">${strayHTML()}</div><svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMin meet" focusable="false">
     <g class="bd-court">${lines}${rows}<ellipse cx="300" cy="330" rx="150" ry="34"/><path d="M215 396 V300 H385 V396"/></g>
-    <g class="bd-ball"><circle cx="300" cy="150" r="104"/><ellipse cx="300" cy="150" rx="44" ry="104"/><path d="M196 150 H404"/><path d="M226 80 Q300 150 226 220"/><path d="M374 80 Q300 150 374 220"/></g>
-    <g class="bd-hoop"><rect x="418" y="46" width="96" height="62" rx="3"/><rect x="448" y="76" width="36" height="26"/><path d="M440 108 H492"/><ellipse cx="466" cy="112" rx="26" ry="6"/><path class="bd-net" d="M440 112 L449 146 M452 114 L456 148 M466 118 V150 M480 114 L476 148 M492 112 L483 146 M444 130 H488"/></g>
     <rect class="bd-scan" x="0" y="0" width="600" height="3"/></svg></div>`;
 }
 function titleHTML(): string {

@@ -332,3 +332,16 @@ describe('box score', () => {
     expect(dts).toBeGreaterThan(0);
   });
 });
+
+describe('Iconic permanent boost', () => {
+  it('adds a visible Iconic +2% row to every shot of an Iconic (HOLO too) and none to others', () => {
+    const ic = ballersOfTier('iconic')[0];
+    for (const holo of [false, true]) {
+      const G = game([fake(ic, { holo, tier: 'iconic' }), ...squad().slice(1)], squad());
+      const ch = chance(G, 0, 0, 'mid', shotCtx(G));
+      expect(ch.parts.find((x) => x[0] === 'Iconic +2%')?.[1]).toBe(2);
+    }
+    const G2 = game(squad(), squad());
+    expect(chance(G2, 0, 0, 'mid', shotCtx(G2)).parts.some((x) => x[0].startsWith('Iconic'))).toBe(false);
+  });
+});

@@ -55,9 +55,12 @@ function go(d: number): void { if (items.length < 2) return; at = (at + d + item
 
 /** The card elements around a tapped card become the swipe list (the same pack, collection page or pile). */
 function fromDom(card: HTMLElement, box: HTMLElement): { list: InspectItem[]; idx: number } {
-  const cards = Array.from(box.querySelectorAll<HTMLElement>('.card')).filter((c) => !c.closest('#inspect'));
+  // during an opening: the pile in order, then the featured (last, face up) card in front of it
+  const solo = box.querySelector<HTMLElement>('.flip.solo.shown');
+  const cards = Array.from(box.querySelectorAll<HTMLElement>('.card')).filter((c) => !c.closest('#inspect') && !c.closest('.flip.solo'));
+  if (solo) { const f = solo.querySelector<HTMLElement>('.front .card'); if (f) cards.push(f); }
   const list = cards.map((c) => {
-    const wrap = c.closest<HTMLElement>('.cwrap, .sum-card, .pile-card') ?? c.parentElement!;
+    const wrap = c.closest<HTMLElement>('.cwrap, .sum-card, .pile-card, .flip.solo') ?? c.parentElement!;
     const parts = [wrap.querySelector('.lvbox b')?.textContent, wrap.querySelector('.dupe b')?.textContent].filter(Boolean).map((x) => (x as string).replace(/[<&]/g, ''));
     const tier = c.querySelector('.tier-tag')?.textContent;
     return { html: c.outerHTML.replace(/\sdata-a="[^"]*"/g, ''), info: [tier, ...parts].filter(Boolean).join(' · '), foil: !!wrap.querySelector('.foilfx') || c.classList.contains('holo') };
@@ -68,8 +71,9 @@ export function initInspect(): void {
   document.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
     const card = t.closest<HTMLElement>('.card');
-    if (!card || card.closest('#inspect, .flip.solo, .hcard, button, [data-a]')) return;
-    const box = card.closest<HTMLElement>('.sum-grid, .op-pile, .card-grid');
+    const featured = !!card?.closest('.flip.solo.shown.final');
+    if (!card || card.closest('#inspect, .hcard, button') || (!featured && card.closest('.flip.solo, [data-a]'))) return;
+    const box = featured ? card.closest<HTMLElement>('.op-stage') : card.closest<HTMLElement>('.sum-grid, .op-pile, .card-grid');
     if (!box) return;
     const { list, idx } = fromDom(card, box);
     openInspect(list, idx);

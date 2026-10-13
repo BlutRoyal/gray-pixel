@@ -1,0 +1,78 @@
+/* Ballerz branding (round 5): the official logo as the hero emblem and backdrop, and its blue/red as small accents.
+   The neon cyan / magenta / amber theme stays dominant: blue and red only appear as thin trims, side chips and soft tints. */
+:root {
+  --bz-blue: #0072bc;
+  --bz-red: #ed1c24;
+  --bz-split: linear-gradient(90deg, var(--bz-blue) 0 50%, var(--bz-red) 50% 100%);
+}
+
+/* ---- page backdrop: a large faint emblem replaces the old sun ---- */
+.bg-sun { top: 46vh; width: min(88vmin, 760px); height: min(88vmin, 760px); border-radius: 0; filter: none; opacity: .11;
+  background: var(--bz-emb) center / contain no-repeat;
+  -webkit-mask-image: linear-gradient(#000 55%, transparent 98%); mask-image: linear-gradient(#000 55%, transparent 98%); }
+.bg-sun::before, .bg-sun::after { content: ''; position: absolute; inset: 0; background: var(--bz-emb) center / contain no-repeat; opacity: 0; mix-blend-mode: screen; animation: bzghost 11s steps(1) infinite; }
+.bg-sun::after { animation-delay: -5.2s; }
+@keyframes bzghost { 0%, 90%, 100% { opacity: 0; transform: none; clip-path: none; } 91% { opacity: .9; transform: translate(-7px, 0); clip-path: inset(18% 0 58% 0); } 93% { opacity: .9; transform: translate(6px, 2px); clip-path: inset(62% 0 12% 0); } 95% { opacity: .6; transform: translate(-3px, 0); clip-path: inset(35% 0 40% 0); } }
+body:has(.title) .bg-sun { opacity: 0; }
+
+/* ---- title: the emblem is the hero behind the Coach ---- */
+.tt-emb { position: absolute; left: 50%; top: 14px; width: min(430px, 82vw); aspect-ratio: 402 / 403; transform: translateX(-50%); z-index: 0; pointer-events: none;
+  background: var(--bz-emb) center / contain no-repeat; opacity: .46;
+  -webkit-mask-image: linear-gradient(#000 52%, transparent 96%); mask-image: linear-gradient(#000 52%, transparent 96%); }
+.tt-emb::before, .tt-emb::after { content: ''; position: absolute; inset: 0; background: var(--bz-emb) center / contain no-repeat; opacity: 0; mix-blend-mode: screen; animation: bzghost 7s steps(1) infinite; }
+.tt-emb::after { animation-delay: -3.4s; }
+.tt-emb i.stray { position: absolute; right: 2%; top: 4%; }
+.tt-bd { opacity: 1; }
+@media (min-width: 900px) { .tt-emb { width: 430px; top: 4px; } }
+
+/* ---- splash / loading: the emblem above the wordmark ---- */
+.boot-mark { position: relative; display: block; width: clamp(96px, 28vw, 132px); aspect-ratio: 402 / 403; margin: 0 auto 4px; background: var(--bz-emb) center / contain no-repeat; filter: drop-shadow(0 0 14px rgba(25, 246, 255, .35)); }
+.boot-mark::before, .boot-mark::after { content: ''; position: absolute; inset: 0; background: var(--bz-emb) center / contain no-repeat; opacity: 0; mix-blend-mode: screen; animation: bzghost 5s steps(1) infinite; }
+.boot-mark::after { animation-delay: -2.4s; }
+.boot-mark i.stray { position: absolute; right: -14px; top: 6px; }
+.boot::after { content: ''; position: absolute; left: 50%; top: 50%; width: min(120vmin, 900px); aspect-ratio: 402 / 403; transform: translate(-50%, -50%); background: var(--bz-emb) center / contain no-repeat; opacity: .07; pointer-events: none; }
+
+/* ---- top bar mark ---- */
+.brand-emb { flex: none; align-self: center; width: 26px; height: 26px; object-fit: contain; margin-right: 2px; filter: drop-shadow(0 0 6px rgba(25, 246, 255, .35)); }
+.top { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, color-mix(in srgb, var(--bz-blue) 80%, transparent) 0 50%, color-mix(in srgb, var(--bz-red) 80%, transparent) 50% 100%) 1; padding-bottom: 10px; }
+
+/* ---- packs: the emblem replaces the pack's sun; blue / red trim on the crimps ---- */
+.pa-sun { border-radius: 0; background: var(--bz-emb) center / contain no-repeat; opacity: .5; aspect-ratio: 402 / 403; }
+.pa-crimp { box-shadow: inset 0 -2px 0 var(--bz-blue); border-image: none; }
+.pa-crimp.top { background-image: var(--bz-split), repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 3px, rgba(0,0,0,.25) 3px 6px); background-size: 100% 2px, auto; background-repeat: no-repeat, repeat; background-position: 0 100%, 0 0; box-shadow: none; }
+.pa-crimp.bot { background-image: var(--bz-split), repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 3px, rgba(0,0,0,.25) 3px 6px); background-size: 100% 2px, auto; background-repeat: no-repeat, repeat; background-position: 0 0, 0 0; box-shadow: none; }
+
+/* ---- card backs: split-colour inner trim ---- */
+.back::after { content: ''; position: absolute; inset: 7px; border: 2px solid transparent; border-image: linear-gradient(90deg, var(--bz-blue) 0 50%, var(--bz-red) 50% 100%) 1; opacity: .5; pointer-events: none; }
+
+/* ---- scoreboard: you = Ballerz blue, CPU = Ballerz red (thin chips and soft tints; the numbers stay neon) ---- */
+.jumbo { background-image: linear-gradient(90deg, color-mix(in srgb, var(--bz-blue) 70%, transparent), color-mix(in srgb, var(--bz-red) 70%, transparent)), linear-gradient(90deg, color-mix(in srgb, var(--bz-blue) 20%, transparent), transparent 38%, transparent 62%, color-mix(in srgb, var(--bz-red) 20%, transparent)), linear-gradient(180deg, #0c1230, #05071a);
+  background-size: 100% 2px, 100% 100%, 100% 100%; background-position: 0 100%, 0 0, 0 0; background-repeat: no-repeat; }
+.jb-lab::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; vertical-align: 0; background: var(--bz-blue); box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+.jb-side.cpu .jb-lab::before { background: var(--bz-red); }
+.jb-side.cpu .jb-lab { display: block; }
+.scoreboard .sb-side.you { border-left: 3px solid var(--bz-blue); padding-left: 8px; } .scoreboard .sb-side.cpu { border-right: 3px solid var(--bz-red); padding-right: 8px; }
+
+/* ---- token frames: you vs CPU, still neon but nudged to the logo colours ---- */
+.tok.me { --ring: color-mix(in srgb, var(--bz-blue) 45%, var(--cyan)); }
+.tok.cpu { --ring: color-mix(in srgb, var(--bz-red) 50%, var(--magenta)); }
+.tok.cpu .tok-img { box-shadow: 0 0 12px color-mix(in srgb, var(--bz-red) 50%, var(--magenta)), 0 6px 14px rgba(0, 0, 0, .55); }
+.bx-team h3 { border-left-color: var(--bz-blue); background: color-mix(in srgb, var(--bz-blue) 14%, transparent); }
+.bx-team.side1 h3 { border-left-color: var(--bz-red); background: color-mix(in srgb, var(--bz-red) 14%, transparent); }
+
+/* ---- selection highlights and dividers ---- */
+.tabs button.on { position: relative; } .tabs button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px; background: var(--bz-split); }
+.cs-pick.on { box-shadow: 0 2px 0 -0px var(--bz-blue), 2px 0 0 -0px var(--bz-blue); }
+.tok.sel .tok-img { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--bz-blue), 0 0 22px var(--ring), 0 6px 14px rgba(0, 0, 0, .55); }
+.pk.on { box-shadow: 0 0 0 1px var(--cyan) inset, 0 -2px 0 var(--bz-blue) inset, 0 0 12px rgba(25, 246, 255, .25); }
+.panel > h2.h::after, .tt-head::after { content: ''; display: block; height: 2px; width: 72px; margin: 6px auto 0; background: var(--bz-split); opacity: .85; }
+.panel > h2.h::after { margin-left: 0; }
+
+/* ---- lite mode and reduced motion: static, no filters or glitch layers ---- */
+html.lite .bg-sun::before, html.lite .bg-sun::after, html.lite .tt-emb::before, html.lite .tt-emb::after, html.lite .boot-mark::before, html.lite .boot-mark::after { display: none; }
+html.lite .boot-mark, html.lite .brand-emb { filter: none; }
+html.lite .bg-sun, html.lite .tt-emb { opacity: .14; -webkit-mask-image: none; mask-image: none; display: block !important; }
+html.lite .tt-emb { opacity: .22; }
+html.lite .boot::after { display: none; }
+@media (prefers-reduced-motion: reduce) { .bg-sun::before, .bg-sun::after, .tt-emb::before, .tt-emb::after, .boot-mark::before, .boot-mark::after { display: none; } }
+html.lite .flip.solo.g-heavy .back, html.lite .flip.solo.g-heavy .back-tear { animation: none !important; }

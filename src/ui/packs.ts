@@ -179,12 +179,12 @@ function showPack(): void {
   const art = packArt(op.def, true);
   const cls = holo ? ' glitch tease-holo' : tease.kind === 'iconic' ? ' tease-iconic' : tease.kind === 'epic+' ? ' tease-shake' : '';
   if (holo) o.classList.add('holo-pack');
-  o.innerHTML = `${holo ? '<span class="pk-static" aria-hidden="true"></span>' : ''}<div class="op-stage"><button class="pack-hit${cls}" data-a="rip" aria-label="Rip the pack open">${holo
-    ? `<span class="gl-wrap">${art}<span class="gl-layer gl-a" aria-hidden="true">${art}</span><span class="gl-layer gl-b" aria-hidden="true">${art}</span></span>` : art}</button>
+  o.innerHTML = `${holo ? '<span class="pk-static" aria-hidden="true"></span>' : ''}<div class="op-stage"><button class="pack-hit${cls}" data-a="rip" aria-label="Tap to open the pack"><span class="pk-tilt" data-tilt>${holo
+    ? `<span class="gl-wrap">${art}<span class="gl-layer gl-a" aria-hidden="true">${art}</span><span class="gl-layer gl-b" aria-hidden="true">${art}</span></span>` : art}</span></button>
+    <p class="pk-tap" aria-hidden="true">TAP TO OPEN</p>
     <p class="op-hint${holo ? ' gl-text' : ''}" data-text="${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}">${holo ? PACK_LINES.ripIconic : PACK_LINES.ripHint}</p><button class="btn sm op-skip-pack" data-a="opskip">Skip all</button></div>`;
   (o.querySelector('.pack-hit') as HTMLElement).focus();
-  // the pack opens itself after its tease; a tap on it rips at once
-  later(() => rip(), reduced() ? 100 : tease.kind === 'holo' ? 2600 : tease.kind === 'iconic' ? 1700 : tease.kind === 'epic+' ? 1400 : 800);
+  // the sealed pack waits for one tap (or Enter); after that the opening runs by itself
   if (!reduced()) {
     if (holo) { sfx('glitch2'); later(() => sfx('glitch3'), 420); later(() => sfx('glitch1'), 1500); }
     else if (tease.kind === 'iconic') sfx('glitch1', { v: 0.55 });
@@ -198,6 +198,7 @@ function rip(): void {
   const o = overlayEl(), tease = packTease(op.pulls), key = tease.best.replace('+', 'plus'), rank = preFlip(bestPull(op)).sfxRank;
   const btn = o.querySelector('.pack-hit') as HTMLElement;
   // the tear flashes in the colour of the best card inside; Epic and Legendary share one colour
+  o.querySelector('.pk-tap')?.remove();
   btn.classList.add('ripping', 'best-' + key);
   if (tease.kind === 'holo') o.classList.add('tear');
   const wait = liteOn() ? Math.round(tease.ripMs * 0.6) : tease.ripMs;
@@ -329,6 +330,7 @@ function reveal(): void {
   if (last) {
     // the last card stays up front (it tilts like any card) above the pile until SEE SUMMARY is tapped
     op.final = true;
+    el.classList.add('final');
     nextBtn('SEE SUMMARY', true);
     return;
   }
@@ -349,6 +351,7 @@ function settle(): void {
   op.i++;
   dealCard();
   op.pile = op.pile.map((h) => h.replace(' fresh', ''));
+  fitCards(overlayEl());
 }
 /** A tap on the card: during the build-up it jumps to the flip, during the turn to the reveal, while it is shown to the next card; a second tap on the same card (or Skip all) goes to the end. */
 function tap(): void {
@@ -379,7 +382,7 @@ function skipToEnd(): void {
   el.classList.add(turnClass(p.tier), 'flipped', 'shown');
   if (p.holo) el.classList.add('foiling');
   el.style.setProperty('--flipms', '0ms');
-  op.step = 'shown'; op.final = true;
+  op.step = 'shown'; op.final = true; el.classList.add('final');
   const hint = o.querySelector('#opHint');
   if (hint) hint.textContent = `${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''} · all opened`;
   nextBtn('SEE SUMMARY', true);

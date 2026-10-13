@@ -2,6 +2,7 @@
 // (#, position, Rim / Mid / Three, DEF, skill, fatigue, level, Sneaker), the sub comparison arrows, and the tiny token badges.
 import { TIER_NAME, type Tier } from '../rules';
 import { FATIGUE, fatigueOf, type CBaller, type Zone } from '../casual/engine';
+import { TUNING } from '../casual/tuning';
 import { POS_NAME, ZONE_NAME, shoeText } from '../casual/skills';
 import { SP_HOLO_TEXT, specialText } from '../casual/specials';
 import { avatar, teamHue } from './avatar';
@@ -63,6 +64,7 @@ export function specialBlockHTML(b: CBaller, c: NonNullable<CardCtx['special']>)
   const btn = c.mine ? `<button class="btn go sp-use" data-a="special" data-v="${c.idx}" ${c.state === 'used' ? 'disabled' : ''}>${c.state === 'used' ? 'Used this game' : 'Use special'}</button>` : '';
   return `<div class="bc-sp ${c.state}${b.holo ? ' holo' : ''}"><div class="bc-sp-h"><span class="sp-ic" aria-hidden="true">⚡</span><b>${esc(sp.name)}</b>${b.holo ? '<i class="holob sm">HOLO</i>' : ''}<em>${st}</em></div>
     <p class="bc-sp-t">${esc(specialText(sp, b.holo))}</p>
+    <small class="bc-ic">Iconic: +${TUNING.iconicBoost}% all shots</small>
     <small class="dim">${esc(sp.flavor)} · ${esc(c.when)}. Once per game, no Momentum.${b.holo ? ' ' + esc(SP_HOLO_TEXT()) : ''}</small>
     ${c.state === 'wait' && c.why ? `<small class="bc-sp-why">Not now: ${esc(c.why)}</small>` : ''}${btn}</div>`;
 }

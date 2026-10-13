@@ -28,6 +28,8 @@ import { strayHTML, wordmarkSVG } from './ui/wordmark';
 import './gray.css';
 import './mobile.css';
 import './lite.css';
+import './ballerz.css';
+import { LOGO_EMBLEM } from './ui/logo';
 import './sound.css';
 import './round3.css';
 
@@ -43,7 +45,7 @@ const app = document.getElementById('app')!;
 
 function topBar(): string {
   return `<header class="top">
-    <div class="brand"><span class="logo" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-top')}</span><span class="logo-sub">${esc(GAME_TAGLINE)}</span></div>
+    <div class="brand"><img class="brand-emb" src="${LOGO_EMBLEM}" alt="Ballerz" width="26" height="26"><span class="logo" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-top')}</span><span class="logo-sub">${esc(GAME_TAGLINE)}</span></div>
     <span class="wallet"><button class="snd-btn${getAudio().mute ? ' muted' : ''}" data-a="sound" type="button" aria-label="Sound settings" title="Sound settings">${speakerIcon(getAudio().mute)}</button><span class="bucks" title="Bucks: earned by playing, spent on packs"><i aria-hidden="true">B$</i><b id="bucks">${profile().bucks}</b></span>
     <span class="bucks shards" title="Shards: level up your Ballerz in Collection"><i aria-hidden="true">SH</i><b id="shardsn">${profile().shards}</b></span></span>
     <nav class="tabs" aria-label="Main">${TABS.map(([k, t]) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''}" ${tab === k ? 'aria-current="page"' : ''}>${t}${k === 'play' && inGame() ? ' ●' : ''}</button>`).join('')}</nav>
@@ -155,7 +157,7 @@ function splash(): void {
   const o = document.createElement('div');
   o.className = 'boot splash';
   o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Gray Pixel');
-  o.innerHTML = `<div class="boot-in"><span class="boot-t" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-boot')}</span><p class="boot-sub">${esc(GAME_TAGLINE)}</p><ol>${BOOT_LINES.map((l, i) => `<li style="--i:${i}">${esc(l)}</li>`).join('')}</ol><i class="boot-bar"></i><p class="boot-go"><b>${esc(SPLASH_PROMPT)}</b><i class="stray" aria-hidden="true"></i><small>${esc(SPLASH_HINT)}</small></p><button class="boot-lite" data-a="lite" type="button">Lite mode: ${esc(liteLabel())}</button><button class="boot-snd" data-a="sound" type="button" aria-label="Sound settings">${speakerIcon(getAudio().mute)} Sound</button></div>`;
+  o.innerHTML = `<div class="boot-in"><span class="boot-mark" role="img" aria-label="Ballerz logo">${strayHTML()}</span><span class="boot-t" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-boot')}</span><p class="boot-sub">${esc(GAME_TAGLINE)}</p><ol>${BOOT_LINES.map((l, i) => `<li style="--i:${i}">${esc(l)}</li>`).join('')}</ol><i class="boot-bar"></i><p class="boot-go"><b>${esc(SPLASH_PROMPT)}</b><i class="stray" aria-hidden="true"></i><small>${esc(SPLASH_HINT)}</small></p><button class="boot-lite" data-a="lite" type="button">Lite mode: ${esc(liteLabel())}</button><button class="boot-snd" data-a="sound" type="button" aria-label="Sound settings">${speakerIcon(getAudio().mute)} Sound</button></div>`;
   document.body.appendChild(o);
   const go = (e: Event): void => {
     if ((e.target as HTMLElement | null)?.closest?.('.boot-lite,.boot-snd') || soundOpen()) return;
@@ -173,4 +175,5 @@ function splash(): void {
   document.addEventListener('keydown', go, true);
   o.addEventListener('pointerdown', go);
 }
+document.documentElement.style.setProperty('--bz-emb', `url("${LOGO_EMBLEM}")`);
 splash();

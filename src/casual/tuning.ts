@@ -14,7 +14,7 @@ export const DEFAULTS = {
   a1Base: 8, a1Dnk: 10, a1Def: 6, a1Beat: 10, a1Cap: 35,
   powRare: 1.5, powEpic: 1.5, powLegendary: 1.5, powIconic: 1.5, lvStep: 2, lvStepBasic: 1,
   snkCommon: 1, snkUncommon: 2, snkRare: 4, snkLegendary: 6, snkIconic: 8, snkBullseye: 8, snkCustom: 3, snkPlain: 2,
-  spOn: 1, spScale: 1, spOff: 2.2, spDef: 2.2, spUtil: 1, spHolo: 1.3, spHoloMo: 1, icPassive: 0,
+  spOn: 1, spScale: 1, spOff: 2.2, spDef: 2.2, spUtil: 1, spHolo: 1.3, spHoloMo: 1, icPassive: 0, iconicBoost: 2,
 };
 export type TuneKey = keyof typeof DEFAULTS;
 export const TUNING: Record<TuneKey, number> = { ...DEFAULTS };
@@ -82,6 +82,7 @@ export const TUNE_DEFS: TuneDef[] = [
   { key: 'spUtil', label: 'Special strength x, utility specials', group: 'Specials', min: 0.3, max: 2, step: 0.05 },
   { key: 'spHolo', label: 'HOLO special strength x', group: 'Specials', min: 1, max: 2, step: 0.05, hint: '1.3 = HOLO is 30% stronger' },
   { key: 'icPassive', label: 'Iconic keeps a passive skill (1) / special only (0)', group: 'Specials', min: 0, max: 1, step: 1, hint: '0 = an Iconic has ONLY his special (default); 1 = the old passive plus special, for comparison sims' },
+  { key: 'iconicBoost', label: 'Iconic permanent boost % (all shots)', group: 'Specials', min: 0, max: 8, step: 0.5, hint: 'Every Iconic Baller (HOLO too) gets this on every shot, on top of his once-per-game special' },
   { key: 'spHoloMo', label: 'HOLO special extra Momentum', group: 'Specials', min: 0, max: 4, step: 1 },
 ];
 const KEY = 'bdl-tuning';
