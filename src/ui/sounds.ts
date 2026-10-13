@@ -311,6 +311,41 @@ const iconicHit: Recipe = (r, t, o) => {
   for (let k = 0; k < 8; k++) osc(r, 'sine', 3500 + R() * 5000, 3500 + R() * 5000, b + 0.2 + k * 0.07, 0.15, 0.1 * v, { a: 0.001, rev: 0.3 });
   return 2.1;
 };
+/** The long build-up before an Epic-or-better card turns: a rising rumble, a tearing riser, crackle and a held breath. Rank 4 = Epic or Legendary (identical), 5 = Iconic; level 1 = HOLO adds glitch stutter. */
+const venitus: Recipe = (r, t, o) => {
+  const v = o.v ?? 1, rank = o.rank ?? 4, d = (o.ms ?? 3400) / 1000, R = rng(91 + rank), holo = (o.level ?? 0) > 0;
+  sweepSaw(r, t, d, 38, 96 + rank * 22, 110, 600 + rank * 700, (0.34 + rank * 0.05) * v, { crush: rank >= 5 ? 6 : 0 });
+  sweepSaw(r, t, d, 39.6, 99 + rank * 22, 110, 500 + rank * 600, 0.22 * v);
+  const sw = swell(r, t, d, 0.75 * v), so = r.ctx.createOscillator();
+  so.type = 'sine'; so.frequency.setValueAtTime(30, t); so.frequency.exponentialRampToValueAtTime(64, t + d); so.connect(sw); sw.connect(r.out); so.start(t); so.stop(t + d + 0.1);
+  nz(r, t, d, 0.5 * v, { ft: 'lowpass', f0: 180, f1: 2600, q: 1.3, a: d * 0.75 });
+  nz(r, t + d * 0.3, d * 0.7, 0.3 * v, { ft: 'highpass', f0: 2500, f1: 9000, q: 1, a: d * 0.55 });
+  osc(r, 'sine', 260, 1900, t + d * 0.55, d * 0.45, 0.14 * v, { a: d * 0.4, rev: 0.2 });
+  const n = 10 + rank * 5 + (holo ? 14 : 0);
+  for (let k = 0; k < n; k++) { const at = t + d * (0.25 + 0.7 * R()); click(r, at, (0.25 + 0.3 * (at - t) / d) * v, 3000 + R() * 4500, 0.01); if (holo && k % 2) osc(r, 'square', 200 + R() * 2600, 100 + R() * 800, at, 0.03, 0.16 * v, { crush: 3, a: 0.001 }); }
+  return d + 0.1;
+};
+/** Epic reveal: the shared reveal plus a dark, heavy purple stab. */
+const hitEpic: Recipe = (r, t, o) => {
+  const v = o.v ?? 1;
+  const len = packReveal(r, t, { ...o, rank: 3 });
+  sub(r, t, 72, 30, 0.9, 1.0 * v, { gate: 0.3 }); osc(r, 'sine', 240, 50, t, 0.22, 0.8 * v, { sat: 4 });
+  uni(r, 'sawtooth', [F.c3, F.eb3, F.ab3].map((f) => f * 2), t, 0.85, 0.4 * v, { lp: 2800, crush: 6, rev: 0.35 });
+  nz(r, t, 0.5, 0.55 * v, { ft: 'lowpass', f0: 6500, f1: 200, a: 0.001, gate: 0.4, rev: 0.25 });
+  return Math.max(len, 1.3);
+};
+/** Legendary reveal: bigger and brighter than Epic: a deep drop, a brass fanfare chord and a gold bell cascade. */
+const hitLegendary: Recipe = (r, t, o) => {
+  const v = o.v ?? 1, R = rng(63);
+  const len = packReveal(r, t, { ...o, rank: 4 });
+  sub(r, t, 58, 24, 1.4, 1.15 * v, { gate: 0.35 }); osc(r, 'sine', 300, 45, t, 0.26, 0.9 * v, { sat: 4 }); click(r, t, 1.0 * v, 3000, 0.02);
+  uni(r, 'sawtooth', [F.f3, F.c4, F.f4, F.c5], t, 1.3, 0.55 * v, { lp: 4200, rev: 0.4, hold: 0.1 });
+  uni(r, 'square', [F.f4, F.ab4], t + 0.1, 0.9, 0.2 * v, { lp: 4800, rev: 0.4 });
+  nz(r, t, 1.1, 0.5 * v, { ft: 'highpass', f0: 5500, f1: 2000, a: 0.01, rev: 0.35 });
+  [1, 1.25, 1.5, 2, 2.5, 3].forEach((q, k) => bell(r, t + 0.12 + k * 0.07, F.c5 * q, 0.24 * v, 0.8));
+  for (let k = 0; k < 10; k++) osc(r, 'sine', 3500 + R() * 5000, 3500 + R() * 5000, t + 0.2 + k * 0.06, 0.12, 0.1 * v, { a: 0.001, rev: 0.3 });
+  return Math.max(len, 2.0);
+};
 const nextTick: Recipe = (r, t, o) => { const v = o.v ?? 1; click(r, t, 0.55 * v, 6500, 0.01); osc(r, 'square', 1600, 1400, t, 0.03, 0.2 * v, { lp: 5500 }); sub(r, t, 150, 80, 0.08, 0.6 * v); return 0.1; };
 const summary: Recipe = (r, t, o) => {
   const v = o.v ?? 1;
@@ -386,6 +421,7 @@ export const SOUNDS = {
   glitch1: d((r, t, o) => glitchSting(r, t, { ...o, rank: 1 }), 2, 22, 'big'), glitch2: d((r, t, o) => glitchSting(r, t, { ...o, rank: 2 }), 2, 36, 'big'), glitch3: d((r, t, o) => glitchSting(r, t, { ...o, rank: 3 }), 2, 56, 'big'),
   subSwap: d(subSwap, 1, 8, 'play'), coin: d(coin, 1, 8, 'ui'), shard: d(shard, 1, 12, 'ui'), levelUp: d(levelUp, 2, 24, 'big'), reward: d(reward, 2, 26, 'big'),
   packRip: d(packRip, 2, 36, 'big'), packCharge: d(packCharge, 2, 16, 'play'), packReveal: d(packReveal, 2, 22, 'big'), iconicHit: d(iconicHit, 2, 52, 'big'),
+  venitus: d(venitus, 2, 30, 'play'), hitEpic: d(hitEpic, 2, 44, 'big'), hitLegendary: d(hitLegendary, 2, 60, 'big'),
   special: d((r, t, o) => special(r, t, { ...o, rank: 2 }), 2, 44, 'big'), specialHolo: d((r, t, o) => special(r, t, { ...o, rank: 3 }), 2, 62, 'big'),
   triumphHit: d(triumphHit, 2, 56, 'big'), victory: d((r, t, o) => triumphHit(r, t, { ...o, rank: 0, level: o.level ?? 0.5 }), 2, 56, 'big'), defeat: d(defeat, 1, 16, 'play'),
   nextTick: d(nextTick, 0, 3, 'ui'), summary: d(summary, 2, 30, 'big'), boot: d(boot, 2, 40, 'big'), bounce: d(bounce, 1, 6, 'play'),

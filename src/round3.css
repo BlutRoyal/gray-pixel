@@ -166,3 +166,202 @@ tr.mvp td.pts b { color: #ffb000; } td.pts b { font-size: 14px; }
 .sum-card .ctrait.csp { display: none; }
 .modal.end:has([data-pane=box]:not([hidden])) { width: min(880px, 96vw); max-width: none; }
 @media (min-width: 900px) { .bx-all { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; align-items: start; } .bx-all .bx-mvp, .bx-all .bx-note { grid-column: 1 / -1; } }
+
+/* ================= pack opening round 4: suspense, shared Epic+ hint, glitch teases, pile, foil ================= */
+.flip.h-epicplus { --tc: #ffe08a; }
+.flip.solo .flip-in { transition: transform var(--flipms) cubic-bezier(.25, .9, .25, 1.15), scale .14s ease-out; }
+html.lite .flip.solo .flip-in { transition: transform .3s, scale .14s !important; }
+.flip.solo.beat .flip-in { scale: 1.045; }
+/* face down: edge light leaking from the card (low while waiting, rising during the build-up) */
+.back-leak, .back-tear { position: absolute; inset: 0; pointer-events: none; opacity: 0; border-radius: inherit; }
+.back-leak { background:
+  linear-gradient(90deg, transparent, var(--tc, #fff), transparent) 50% 0 / 72% 4px no-repeat, linear-gradient(90deg, transparent, var(--tc, #fff), transparent) 50% 100% / 72% 4px no-repeat,
+  linear-gradient(180deg, transparent, var(--tc, #fff), transparent) 0 50% / 4px 72% no-repeat, linear-gradient(180deg, transparent, var(--tc, #fff), transparent) 100% 50% / 4px 72% no-repeat;
+  box-shadow: inset 0 0 26px 5px var(--tc, #fff); }
+.flip.solo.h-epicplus.waiting .back-leak, .flip.solo.g-sub.waiting .back-leak, .flip.solo.g-heavy.waiting .back-leak { opacity: .28; }
+.flip.solo.building .back-leak { animation: leak var(--bms) ease-in forwards; }
+@keyframes leak { 0% { opacity: .15; } 18% { opacity: .35; } 22% { opacity: .2; } 45% { opacity: .55; } 48% { opacity: .35; } 70% { opacity: .75; } 74% { opacity: .5; } 92% { opacity: 1; } 100% { opacity: 1; box-shadow: inset 0 0 60px 16px var(--tc, #fff); } }
+.flip.solo.building { animation: bshake var(--bms) steps(1, end) forwards; }
+.flip.solo.building .back { border-color: var(--tc); animation: buildglow var(--bms) ease-in forwards; }
+.flip.solo.building.flare .back { filter: brightness(2.1); }
+.flip.solo.building .hint-sparks i { animation-duration: .5s; }
+@keyframes bshake {
+0.0%{translate:calc(var(--sh,1)*0.06px) calc(var(--sh,1)*0.07px);rotate:calc(var(--sh,1)*0.03deg)}
+0.9%{translate:calc(var(--sh,1)*0.22px) calc(var(--sh,1)*0.07px);rotate:calc(var(--sh,1)*0.04deg)}
+1.8%{translate:calc(var(--sh,1)*-0.24px) calc(var(--sh,1)*-0.01px);rotate:calc(var(--sh,1)*0.04deg)}
+2.7%{translate:calc(var(--sh,1)*0.08px) calc(var(--sh,1)*0.12px);rotate:calc(var(--sh,1)*-0.04deg)}
+3.6%{translate:calc(var(--sh,1)*-0.02px) calc(var(--sh,1)*-0.08px);rotate:calc(var(--sh,1)*0.00deg)}
+4.5%{translate:calc(var(--sh,1)*0.04px) calc(var(--sh,1)*-0.15px);rotate:calc(var(--sh,1)*-0.03deg)}
+5.5%{translate:calc(var(--sh,1)*-0.12px) calc(var(--sh,1)*0.13px);rotate:calc(var(--sh,1)*0.03deg)}
+6.4%{translate:calc(var(--sh,1)*-0.19px) calc(var(--sh,1)*0.10px);rotate:calc(var(--sh,1)*-0.04deg)}
+7.3%{translate:calc(var(--sh,1)*0.07px) calc(var(--sh,1)*-0.13px);rotate:calc(var(--sh,1)*-0.05deg)}
+8.2%{translate:calc(var(--sh,1)*0.22px) calc(var(--sh,1)*-0.10px);rotate:calc(var(--sh,1)*-0.03deg)}
+9.1%{translate:calc(var(--sh,1)*0.29px) calc(var(--sh,1)*0.14px);rotate:calc(var(--sh,1)*-0.02deg)}
+10.0%{translate:calc(var(--sh,1)*0.29px) calc(var(--sh,1)*0.01px);rotate:calc(var(--sh,1)*0.02deg)}
+10.9%{translate:calc(var(--sh,1)*-0.19px) calc(var(--sh,1)*0.17px);rotate:calc(var(--sh,1)*0.02deg)}
+11.8%{translate:calc(var(--sh,1)*0.32px) calc(var(--sh,1)*0.16px);rotate:calc(var(--sh,1)*-0.02deg)}
+12.7%{translate:calc(var(--sh,1)*-0.10px) calc(var(--sh,1)*-0.14px);rotate:calc(var(--sh,1)*-0.05deg)}
+13.6%{translate:calc(var(--sh,1)*-0.32px) calc(var(--sh,1)*-0.09px);rotate:calc(var(--sh,1)*0.01deg)}
+14.5%{translate:calc(var(--sh,1)*-0.38px) calc(var(--sh,1)*0.08px);rotate:calc(var(--sh,1)*-0.02deg)}
+15.5%{translate:calc(var(--sh,1)*-0.15px) calc(var(--sh,1)*0.15px);rotate:calc(var(--sh,1)*-0.00deg)}
+16.4%{translate:calc(var(--sh,1)*-0.16px) calc(var(--sh,1)*-0.01px);rotate:calc(var(--sh,1)*0.03deg)}
+17.3%{translate:calc(var(--sh,1)*-0.39px) calc(var(--sh,1)*0.25px);rotate:calc(var(--sh,1)*-0.08deg)}
+18.2%{translate:calc(var(--sh,1)*0.23px) calc(var(--sh,1)*0.19px);rotate:calc(var(--sh,1)*-0.08deg)}
+19.1%{translate:calc(var(--sh,1)*0.28px) calc(var(--sh,1)*-0.08px);rotate:calc(var(--sh,1)*0.01deg)}
+20.0%{translate:calc(var(--sh,1)*-0.50px) calc(var(--sh,1)*-0.28px);rotate:calc(var(--sh,1)*-0.06deg)}
+20.9%{translate:calc(var(--sh,1)*0.49px) calc(var(--sh,1)*-0.19px);rotate:calc(var(--sh,1)*0.05deg)}
+21.8%{translate:calc(var(--sh,1)*0.48px) calc(var(--sh,1)*0.30px);rotate:calc(var(--sh,1)*-0.03deg)}
+22.7%{translate:calc(var(--sh,1)*-0.17px) calc(var(--sh,1)*0.02px);rotate:calc(var(--sh,1)*0.06deg)}
+23.6%{translate:calc(var(--sh,1)*-0.48px) calc(var(--sh,1)*0.18px);rotate:calc(var(--sh,1)*0.07deg)}
+24.5%{translate:calc(var(--sh,1)*0.46px) calc(var(--sh,1)*-0.36px);rotate:calc(var(--sh,1)*0.10deg)}
+25.5%{translate:calc(var(--sh,1)*-0.55px) calc(var(--sh,1)*-0.13px);rotate:calc(var(--sh,1)*0.03deg)}
+26.4%{translate:calc(var(--sh,1)*0.59px) calc(var(--sh,1)*-0.13px);rotate:calc(var(--sh,1)*0.11deg)}
+27.3%{translate:calc(var(--sh,1)*0.07px) calc(var(--sh,1)*-0.17px);rotate:calc(var(--sh,1)*-0.05deg)}
+28.2%{translate:calc(var(--sh,1)*-0.49px) calc(var(--sh,1)*-0.39px);rotate:calc(var(--sh,1)*-0.10deg)}
+29.1%{translate:calc(var(--sh,1)*0.30px) calc(var(--sh,1)*0.48px);rotate:calc(var(--sh,1)*-0.10deg)}
+30.0%{translate:calc(var(--sh,1)*-0.75px) calc(var(--sh,1)*0.49px);rotate:calc(var(--sh,1)*0.01deg)}
+30.9%{translate:calc(var(--sh,1)*-0.16px) calc(var(--sh,1)*-0.27px);rotate:calc(var(--sh,1)*0.03deg)}
+31.8%{translate:calc(var(--sh,1)*0.59px) calc(var(--sh,1)*-0.05px);rotate:calc(var(--sh,1)*-0.03deg)}
+32.7%{translate:calc(var(--sh,1)*-0.84px) calc(var(--sh,1)*0.47px);rotate:calc(var(--sh,1)*-0.16deg)}
+33.6%{translate:calc(var(--sh,1)*-0.01px) calc(var(--sh,1)*0.40px);rotate:calc(var(--sh,1)*-0.13deg)}
+34.5%{translate:calc(var(--sh,1)*0.48px) calc(var(--sh,1)*0.55px);rotate:calc(var(--sh,1)*0.05deg)}
+35.5%{translate:calc(var(--sh,1)*0.61px) calc(var(--sh,1)*-0.50px);rotate:calc(var(--sh,1)*-0.03deg)}
+36.4%{translate:calc(var(--sh,1)*-0.78px) calc(var(--sh,1)*0.46px);rotate:calc(var(--sh,1)*-0.08deg)}
+37.3%{translate:calc(var(--sh,1)*-0.11px) calc(var(--sh,1)*0.69px);rotate:calc(var(--sh,1)*0.15deg)}
+38.2%{translate:calc(var(--sh,1)*1.14px) calc(var(--sh,1)*-0.07px);rotate:calc(var(--sh,1)*-0.01deg)}
+39.1%{translate:calc(var(--sh,1)*0.57px) calc(var(--sh,1)*-0.03px);rotate:calc(var(--sh,1)*-0.09deg)}
+40.0%{translate:calc(var(--sh,1)*-0.25px) calc(var(--sh,1)*-0.55px);rotate:calc(var(--sh,1)*-0.06deg)}
+40.9%{translate:calc(var(--sh,1)*1.31px) calc(var(--sh,1)*0.74px);rotate:calc(var(--sh,1)*0.06deg)}
+41.8%{translate:calc(var(--sh,1)*-0.00px) calc(var(--sh,1)*-0.27px);rotate:calc(var(--sh,1)*-0.21deg)}
+42.7%{translate:calc(var(--sh,1)*-0.65px) calc(var(--sh,1)*0.49px);rotate:calc(var(--sh,1)*0.19deg)}
+43.6%{translate:calc(var(--sh,1)*-0.41px) calc(var(--sh,1)*0.51px);rotate:calc(var(--sh,1)*0.15deg)}
+44.5%{translate:calc(var(--sh,1)*0.60px) calc(var(--sh,1)*0.30px);rotate:calc(var(--sh,1)*0.14deg)}
+45.5%{translate:calc(var(--sh,1)*-0.44px) calc(var(--sh,1)*0.39px);rotate:calc(var(--sh,1)*-0.13deg)}
+46.4%{translate:calc(var(--sh,1)*-0.05px) calc(var(--sh,1)*0.53px);rotate:calc(var(--sh,1)*0.11deg)}
+47.3%{translate:calc(var(--sh,1)*-0.70px) calc(var(--sh,1)*0.91px);rotate:calc(var(--sh,1)*0.09deg)}
+48.2%{translate:calc(var(--sh,1)*0.28px) calc(var(--sh,1)*-1.03px);rotate:calc(var(--sh,1)*0.03deg)}
+49.1%{translate:calc(var(--sh,1)*-0.91px) calc(var(--sh,1)*0.37px);rotate:calc(var(--sh,1)*-0.02deg)}
+50.0%{translate:calc(var(--sh,1)*1.19px) calc(var(--sh,1)*0.33px);rotate:calc(var(--sh,1)*0.20deg)}
+50.9%{translate:calc(var(--sh,1)*-0.59px) calc(var(--sh,1)*0.33px);rotate:calc(var(--sh,1)*0.17deg)}
+51.8%{translate:calc(var(--sh,1)*1.31px) calc(var(--sh,1)*-0.36px);rotate:calc(var(--sh,1)*0.25deg)}
+52.7%{translate:calc(var(--sh,1)*1.52px) calc(var(--sh,1)*0.46px);rotate:calc(var(--sh,1)*0.35deg)}
+53.6%{translate:calc(var(--sh,1)*1.94px) calc(var(--sh,1)*0.05px);rotate:calc(var(--sh,1)*0.02deg)}
+54.5%{translate:calc(var(--sh,1)*-1.46px) calc(var(--sh,1)*0.88px);rotate:calc(var(--sh,1)*0.34deg)}
+55.5%{translate:calc(var(--sh,1)*-0.10px) calc(var(--sh,1)*0.52px);rotate:calc(var(--sh,1)*0.18deg)}
+56.4%{translate:calc(var(--sh,1)*1.07px) calc(var(--sh,1)*-0.91px);rotate:calc(var(--sh,1)*0.23deg)}
+57.3%{translate:calc(var(--sh,1)*0.39px) calc(var(--sh,1)*0.47px);rotate:calc(var(--sh,1)*-0.07deg)}
+58.2%{translate:calc(var(--sh,1)*0.61px) calc(var(--sh,1)*0.81px);rotate:calc(var(--sh,1)*0.12deg)}
+59.1%{translate:calc(var(--sh,1)*1.11px) calc(var(--sh,1)*-1.43px);rotate:calc(var(--sh,1)*-0.31deg)}
+60.0%{translate:calc(var(--sh,1)*-0.31px) calc(var(--sh,1)*0.47px);rotate:calc(var(--sh,1)*-0.26deg)}
+60.9%{translate:calc(var(--sh,1)*0.99px) calc(var(--sh,1)*0.42px);rotate:calc(var(--sh,1)*-0.44deg)}
+61.8%{translate:calc(var(--sh,1)*-0.16px) calc(var(--sh,1)*-0.90px);rotate:calc(var(--sh,1)*-0.44deg)}
+62.7%{translate:calc(var(--sh,1)*-2.06px) calc(var(--sh,1)*-0.62px);rotate:calc(var(--sh,1)*-0.32deg)}
+63.6%{translate:calc(var(--sh,1)*-1.77px) calc(var(--sh,1)*-1.61px);rotate:calc(var(--sh,1)*-0.04deg)}
+64.5%{translate:calc(var(--sh,1)*-0.71px) calc(var(--sh,1)*0.40px);rotate:calc(var(--sh,1)*0.10deg)}
+65.5%{translate:calc(var(--sh,1)*-1.59px) calc(var(--sh,1)*1.47px);rotate:calc(var(--sh,1)*-0.55deg)}
+66.4%{translate:calc(var(--sh,1)*-0.59px) calc(var(--sh,1)*-0.83px);rotate:calc(var(--sh,1)*-0.10deg)}
+67.3%{translate:calc(var(--sh,1)*-2.46px) calc(var(--sh,1)*1.27px);rotate:calc(var(--sh,1)*-0.14deg)}
+68.2%{translate:calc(var(--sh,1)*-3.04px) calc(var(--sh,1)*0.45px);rotate:calc(var(--sh,1)*-0.48deg)}
+69.1%{translate:calc(var(--sh,1)*0.30px) calc(var(--sh,1)*-0.65px);rotate:calc(var(--sh,1)*0.10deg)}
+70.0%{translate:calc(var(--sh,1)*3.15px) calc(var(--sh,1)*1.31px);rotate:calc(var(--sh,1)*-0.10deg)}
+70.9%{translate:calc(var(--sh,1)*2.20px) calc(var(--sh,1)*0.60px);rotate:calc(var(--sh,1)*-0.17deg)}
+71.8%{translate:calc(var(--sh,1)*-2.58px) calc(var(--sh,1)*0.41px);rotate:calc(var(--sh,1)*0.08deg)}
+72.7%{translate:calc(var(--sh,1)*3.37px) calc(var(--sh,1)*2.07px);rotate:calc(var(--sh,1)*0.14deg)}
+73.6%{translate:calc(var(--sh,1)*-1.12px) calc(var(--sh,1)*1.78px);rotate:calc(var(--sh,1)*-0.68deg)}
+74.5%{translate:calc(var(--sh,1)*-3.03px) calc(var(--sh,1)*0.31px);rotate:calc(var(--sh,1)*0.16deg)}
+75.5%{translate:calc(var(--sh,1)*-2.84px) calc(var(--sh,1)*0.61px);rotate:calc(var(--sh,1)*0.56deg)}
+76.4%{translate:calc(var(--sh,1)*-1.00px) calc(var(--sh,1)*-0.33px);rotate:calc(var(--sh,1)*-0.40deg)}
+77.3%{translate:calc(var(--sh,1)*-1.72px) calc(var(--sh,1)*2.34px);rotate:calc(var(--sh,1)*-0.18deg)}
+78.2%{translate:calc(var(--sh,1)*3.89px) calc(var(--sh,1)*2.10px);rotate:calc(var(--sh,1)*0.15deg)}
+79.1%{translate:calc(var(--sh,1)*-2.07px) calc(var(--sh,1)*2.49px);rotate:calc(var(--sh,1)*-0.01deg)}
+80.0%{translate:calc(var(--sh,1)*-0.75px) calc(var(--sh,1)*-0.96px);rotate:calc(var(--sh,1)*0.77deg)}
+80.9%{translate:calc(var(--sh,1)*-0.07px) calc(var(--sh,1)*-1.15px);rotate:calc(var(--sh,1)*-0.04deg)}
+81.8%{translate:calc(var(--sh,1)*-3.48px) calc(var(--sh,1)*0.67px);rotate:calc(var(--sh,1)*-0.09deg)}
+82.7%{translate:calc(var(--sh,1)*-1.94px) calc(var(--sh,1)*1.59px);rotate:calc(var(--sh,1)*0.55deg)}
+83.6%{translate:calc(var(--sh,1)*-4.67px) calc(var(--sh,1)*0.19px);rotate:calc(var(--sh,1)*-0.39deg)}
+84.5%{translate:calc(var(--sh,1)*4.26px) calc(var(--sh,1)*1.66px);rotate:calc(var(--sh,1)*-0.45deg)}
+85.5%{translate:calc(var(--sh,1)*-2.32px) calc(var(--sh,1)*-2.07px);rotate:calc(var(--sh,1)*0.88deg)}
+86.4%{translate:calc(var(--sh,1)*-2.11px) calc(var(--sh,1)*0.66px);rotate:calc(var(--sh,1)*-0.05deg)}
+87.3%{translate:calc(var(--sh,1)*1.51px) calc(var(--sh,1)*0.65px);rotate:calc(var(--sh,1)*0.46deg)}
+88.2%{translate:calc(var(--sh,1)*-4.05px) calc(var(--sh,1)*1.66px);rotate:calc(var(--sh,1)*-0.38deg)}
+89.1%{translate:calc(var(--sh,1)*0.36px) calc(var(--sh,1)*-1.06px);rotate:calc(var(--sh,1)*-0.40deg)}
+90.0%{translate:calc(var(--sh,1)*0.33px) calc(var(--sh,1)*-0.24px);rotate:calc(var(--sh,1)*-0.28deg)}
+90.9%{translate:calc(var(--sh,1)*2.75px) calc(var(--sh,1)*0.61px);rotate:calc(var(--sh,1)*-0.94deg)}
+91.8%{translate:calc(var(--sh,1)*-2.84px) calc(var(--sh,1)*-0.31px);rotate:calc(var(--sh,1)*0.86deg)}
+92.7%{translate:calc(var(--sh,1)*4.53px) calc(var(--sh,1)*0.32px);rotate:calc(var(--sh,1)*-1.02deg)}
+93.6%{translate:calc(var(--sh,1)*3.31px) calc(var(--sh,1)*-0.52px);rotate:calc(var(--sh,1)*0.16deg)}
+94.5%{translate:calc(var(--sh,1)*2.52px) calc(var(--sh,1)*0.96px);rotate:calc(var(--sh,1)*-0.04deg)}
+95.5%{translate:calc(var(--sh,1)*5.08px) calc(var(--sh,1)*-0.85px);rotate:calc(var(--sh,1)*-0.24deg)}
+96.4%{translate:calc(var(--sh,1)*4.42px) calc(var(--sh,1)*-2.29px);rotate:calc(var(--sh,1)*-0.46deg)}
+97.3%{translate:calc(var(--sh,1)*4.22px) calc(var(--sh,1)*-3.33px);rotate:calc(var(--sh,1)*0.77deg)}
+98.2%{translate:calc(var(--sh,1)*2.54px) calc(var(--sh,1)*-0.53px);rotate:calc(var(--sh,1)*-0.50deg)}
+99.1%{translate:calc(var(--sh,1)*3.72px) calc(var(--sh,1)*3.27px);rotate:calc(var(--sh,1)*-0.85deg)}
+100.0%{translate:calc(var(--sh,1)*-0.29px) calc(var(--sh,1)*0.40px);rotate:calc(var(--sh,1)*-0.01deg)}
+}
+/* a normal Iconic: the back flickers a little; HOLO: it glitches without a pause */
+.flip.solo.g-sub .back-tear { height: 7%; inset: 18% 0 auto 0; background: linear-gradient(90deg, rgba(255,47,208,.55), rgba(61,255,240,.55)); animation: subtear 3.1s steps(1) infinite; }
+@keyframes subtear { 0%, 38%, 44%, 71%, 75%, 100% { opacity: 0; } 40% { opacity: .8; translate: 6px 0; } 42% { opacity: .5; inset-block-start: 61%; translate: -5px 0; } 72% { opacity: .7; inset-block-start: 40%; translate: 4px 0; } }
+.flip.solo.g-heavy .back-tear { height: 12%; inset: 10% 0 auto 0; background: linear-gradient(90deg, rgba(255,47,208,.7), rgba(61,255,240,.7)); animation: heavytear .7s steps(1) infinite; }
+@keyframes heavytear { 0% { opacity: .9; inset-block-start: 8%; translate: 8px 0; } 20% { opacity: .5; inset-block-start: 52%; translate: -9px 0; } 45% { opacity: .9; inset-block-start: 76%; translate: 6px 0; } 70% { opacity: .3; inset-block-start: 30%; translate: -4px 0; } }
+.flip.solo.g-heavy .back { animation: hgfx .5s steps(1) infinite; }
+.flip.solo.g-heavy.building .back { animation: buildglow var(--bms) ease-in forwards, hgfx .5s steps(1) infinite; }
+@keyframes hgfx { 0%, 100% { filter: none; translate: 0 0; } 20% { filter: hue-rotate(60deg) brightness(1.3); translate: -4px 0; } 40% { filter: invert(.12); translate: 5px 1px; } 70% { filter: contrast(1.4) brightness(1.5); translate: -2px -1px; } }
+.flip.glitching .flip-in { animation: none; }
+.flip.solo.flipping.glitching .back { animation: buildglow var(--flipms) ease-in forwards, hgfx .4s steps(1) infinite; }
+.flip.solo.flipping.glitching .front { animation: hgfx .4s steps(1) infinite; }
+/* after the turn: Iconic jolts lightly, HOLO hard */
+.flip.solo.lglitch .front { animation: lgl .8s steps(1) 1; }
+@keyframes lgl { 0%, 30%, 40%, 100% { filter: none; translate: 0 0; } 10% { filter: drop-shadow(-3px 0 rgba(255,47,208,.8)) drop-shadow(3px 0 rgba(61,255,240,.8)); translate: 3px 0; } 20% { translate: -2px 0; filter: brightness(1.3); } }
+.flip.solo.hglitch .front { animation: hgl 1.3s steps(1) 1; }
+@keyframes hgl { 0%, 100% { filter: none; translate: 0 0; } 8% { filter: drop-shadow(-6px 0 rgba(255,47,208,.9)) drop-shadow(6px 0 rgba(61,255,240,.9)); translate: 7px 0; } 16% { translate: -8px 2px; filter: invert(.15) hue-rotate(90deg); } 28% { filter: brightness(1.8) contrast(1.3); translate: 4px 0; } 40% { filter: drop-shadow(5px 0 rgba(255,47,208,.9)) drop-shadow(-5px 0 rgba(61,255,240,.9)); translate: -5px -1px; } 55% { filter: none; translate: 3px 0; } 70% { filter: hue-rotate(200deg); translate: 0 0; } 85% { filter: brightness(1.4); translate: -3px 0; } }
+/* HOLO foil: a rainbow film wrapped around the card from the moment it turns; it stays on the card in the pile and the summary */
+.foilfx { display: none; position: absolute; inset: -7px; z-index: 4; pointer-events: none; border-radius: 20px; box-shadow: 0 0 26px 4px rgba(255,79,216,.45), 0 0 44px 8px rgba(25,246,255,.28); }
+.foilfx::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 5px; background: linear-gradient(115deg, #ff2fd0, #ffe27a, #7dff6a, #19f6ff, #8a5bff, #ff2fd0, #ffe27a) 0 0 / 300% 100%; animation: foilmove 2.2s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.foilfx::after { content: ''; position: absolute; inset: 7px; border-radius: 13px; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.38) 45%, rgba(255,120,240,.28) 55%, transparent 80%) 0 0 / 250% 100%; mix-blend-mode: color-dodge; animation: foilmove 2.6s linear infinite reverse; }
+@keyframes foilmove { to { background-position: 300% 0; } }
+.flip.foiling .foilfx, .pile-card .foilfx, .sum-card .foilfx { display: block; }
+.flip.foiling .foilfx { animation: foilin .5s ease-out; }
+@keyframes foilin { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+.sum-card.foil-on, .pile-card.foil-on { overflow: visible; }
+.pile-card .foilfx, .sum-card .foilfx { inset: -4px; border-radius: 12px; } .pile-card .foilfx::before, .sum-card .foilfx::before { padding: 3px; } .pile-card .foilfx::after, .sum-card .foilfx::after { inset: 4px; }
+html.lite .foilfx { box-shadow: none; } html.lite .foilfx::after { display: none; } html.lite .foilfx::before { animation: none; background-size: 100% 100%; }
+/* the sealed pack: HOLO glitches hard, normal Iconic flickers briefly, Epic and Legendary shake the same slight way */
+.pack-hit.tease-shake { animation: pkrumble .18s linear infinite; }
+@keyframes pkrumble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2px, 1px) rotate(-.4deg); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, -1px) rotate(.4deg); } }
+.pack-hit.tease-iconic { animation: wobble 2.4s ease-in-out infinite, pkflick 3.4s steps(1) infinite; }
+@keyframes pkflick { 0%, 100% { filter: none; } 31% { filter: drop-shadow(-2px 0 rgba(255,47,208,.7)) drop-shadow(2px 0 rgba(61,255,240,.7)); } 33% { filter: none; } 62% { filter: brightness(1.35); } 63% { filter: none; } }
+.pack-hit.tease-holo { animation: wobble 2.4s ease-in-out infinite, hsplit .45s steps(1) infinite; }
+@keyframes hsplit { 0% { filter: drop-shadow(-6px 0 rgba(255,47,208,.9)) drop-shadow(6px 0 rgba(61,255,240,.9)); translate: 3px 0; } 25% { filter: drop-shadow(5px 2px rgba(255,47,208,.9)) drop-shadow(-5px -2px rgba(61,255,240,.9)); translate: -5px 1px; } 50% { filter: brightness(1.5) drop-shadow(-3px 0 rgba(255,47,208,.9)); translate: 0 0; } 75% { filter: drop-shadow(8px 0 rgba(61,255,240,.9)) drop-shadow(-8px 0 rgba(255,47,208,.9)); translate: 6px -2px; } }
+.pack-hit.tease-holo .gl-layer.gl-a, .pack-hit.tease-holo .gl-layer.gl-b, .pack-hit.tease-holo .gl-wrap > .pack-art { animation-duration: .9s; }
+.holo-pack .op-stage { animation: pkstage .24s steps(2) infinite; }
+@keyframes pkstage { 0% { translate: 0 0; } 50% { translate: -3px 2px; } 100% { translate: 3px -2px; } }
+.pk-static { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .55; background: repeating-linear-gradient(0deg, rgba(255,255,255,.09) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255,47,208,.07) 0 2px, rgba(61,255,240,.07) 2px 4px); animation: pkstat .2s steps(2) infinite; }
+.pk-static::before { content: ''; position: absolute; left: 0; right: 0; height: 9%; top: 20%; background: linear-gradient(90deg, rgba(255,47,208,.35), rgba(255,255,255,.28), rgba(61,255,240,.35)); animation: pktear 1.3s steps(1) infinite; }
+@keyframes pkstat { 0% { background-position: 0 0, 0 0; } 50% { background-position: 0 2px, 3px 0; opacity: .4; } 100% { background-position: 0 -1px, -2px 0; } }
+@keyframes pktear { 0% { top: 6%; translate: 14px 0; } 20% { top: 41%; translate: -22px 0; } 40% { top: 72%; translate: 10px 0; } 60% { top: 28%; translate: -8px 0; } 80% { top: 88%; translate: 26px 0; } }
+.opening.tear .pk-static { opacity: .95; } .opening.tear .op-stage { animation-duration: .12s; }
+.opening > .op-stage { position: relative; z-index: 2; }
+html.lite .pk-static { animation: none; opacity: .4; } html.lite .pk-static::before { display: none; }
+html.lite .pack-hit.tease-holo { outline: 3px solid #ff4fd8; outline-offset: 4px; animation: none; } html.lite .pack-hit.tease-iconic, html.lite .pack-hit.tease-shake { animation: none; }
+html.lite .holo-pack .op-stage { animation: none; }
+.pack-hit.best-epicplus .pack-art { --glow: #ffe08a; } .pack-hit.best-holo .pack-art, .pack-hit.best-iconic .pack-art { --glow: var(--t-iconic); }
+.opening.rays-epicplus { --ray: #ffe08a; }
+.op-all { margin-top: 4px; letter-spacing: .14em; }
+.flash.small { opacity: .6; animation-duration: .5s; } .flash.t-epic { background: radial-gradient(circle, rgba(220,170,255,.8), rgba(150,80,255,.35) 40%, transparent 70%); }
+/* OPEN ALL: the stack builds on a fanned pile */
+.op-stage.auto .flip.solo { width: min(56vw, 250px, max(110px, calc((100dvh - 360px) * 5 / 7))); }
+.op-pile { --pw: min(21vw, 140px); display: flex; justify-content: center; align-items: flex-end; width: 100%; min-height: calc(var(--pw) * 1.4); padding: 4px 0 8px; }
+.pile-card { position: relative; flex: 0 0 auto; width: var(--pw); aspect-ratio: 5 / 7; margin-left: calc(var(--pw) * -.3); transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) skewX(var(--k, 0deg)); box-shadow: 0 4px 10px rgba(0,0,0,.55); border-radius: 8px; }
+.pile-card:first-child { margin-left: 0; } .pile-card > .card, .pile-card > .bcard { position: absolute; inset: 0; }
+.pile-card.fresh { animation: pilein .5s cubic-bezier(.2, .8, .3, 1.1); }
+@keyframes pilein { from { transform: translateY(-120px) scale(2.2) rotate(0); opacity: .2; } }
+html.lite .pile-card { box-shadow: none; } html.lite .pile-card.fresh { animation: none; }
+@media (prefers-reduced-motion: reduce) { .flip.solo.building, .flip.solo.building .back-leak, .holo-pack .op-stage, .pk-static, .pk-static::before, .pack-hit.tease-shake, .foilfx::before, .foilfx::after, .flip.solo.g-sub .back-tear, .flip.solo.g-heavy .back-tear, .flip.solo.g-heavy .back { animation: none; } .pile-card.fresh { animation: none; } }
+/* no filters on the faces while they turn: a filter would flatten the 3D flip and show the back ghosted */
+.flip.solo.flipping .back { animation: backfade var(--flipms) linear forwards; }
+@keyframes backfade { 0%, 40% { opacity: 1; } 41%, 100% { opacity: 0; } }
+.flip.solo.flipping.glitching .back { animation: backfade var(--flipms) linear forwards, hgfxt .4s steps(1) infinite; }
+.flip.solo.flipping.glitching .front { animation: hgfxt .4s steps(1) infinite; }
+@keyframes hgfxt { 0%, 100% { translate: 0 0; } 20% { translate: -4px 0; } 40% { translate: 5px 1px; } 70% { translate: -3px -1px; } }
+.walkout b { font-size: clamp(36px, 11.5vw, 140px); }

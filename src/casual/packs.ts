@@ -110,7 +110,7 @@ function playPool(t: Tier): CCard[] {
   return PLAY_POOL[t];
 }
 export const playPoolSize = (t: Tier): number => playPool(t).length;
-function pullOne(kind: PullKind, tier: Tier): Pull {
+export function pullOne(kind: PullKind, tier: Tier): Pull {
   if (kind === 'baller') {
     const pool = ballersOfTier(tier), id = pool[ri(pool.length)];
     return { kind, key: 'b:' + id, id, tier, holo: tier === 'iconic' && rnd() < HOLO_ICONIC };

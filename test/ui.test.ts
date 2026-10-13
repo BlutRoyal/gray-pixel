@@ -51,7 +51,7 @@ describe('Gray Pixel branding', () => {
 });
 
 import { DRIVE_END, DRIVE_START, SCHEME_SPOTS, dunks, formationFor } from '../src/ui/geometry';
-import { dropFrames } from '../src/ui/packs';
+import { glideFrames } from '../src/ui/reveal';
 describe('round 2B geometry and pack drop', () => {
   it('puts the man on the ball on the spot nearest the shooter, every defender on a different spot', () => {
     for (const z of ['rim', 'mid', 'three'] as const) {
@@ -66,11 +66,12 @@ describe('round 2B geometry and pack drop', () => {
     expect(Math.min(...SCHEME_SPOTS.three.map((p) => p[1]))).toBeGreaterThan(48);
   });
   it('Bigs and high Rim ratings dunk', () => { expect(dunks({ pos: 'B', rim: 50 })).toBe(true); expect(dunks({ pos: 'G', rim: 90 })).toBe(true); expect(dunks({ pos: 'G', rim: 70 })).toBe(false); });
-  it('a drop has one hit per bounce plus the landing, each softer than the last', () => {
-    const d2 = dropFrames(600, [120, 50]), d3 = dropFrames(600, [120, 60, 25]);
-    expect(d2.hits).toHaveLength(3); expect(d3.hits).toHaveLength(4);
-    expect(d2.hits[1].power).toBeLessThan(d2.hits[0].power); expect(d3.dur).toBeGreaterThan(d2.dur);
-    expect(d2.keys[d2.keys.length - 1].offset).toBe(1);
+  it('a card glides in from above with one light settle, not a repeated bounce', () => {
+    const g = glideFrames(600);
+    expect(g.keys).toHaveLength(3); expect(g.keys[g.keys.length - 1].offset).toBe(1);
+    expect(g.hit).toBeLessThan(g.dur);
+    const settle = /translateY\((-?[\d.]+)px\)/.exec(String(g.keys[1].transform))![1];
+    expect(Math.abs(+settle)).toBeLessThan(12);
   });
 });
 
