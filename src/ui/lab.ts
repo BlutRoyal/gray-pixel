@@ -12,7 +12,8 @@ import { glitchSlam, setSpeed } from './fx';
 import { esc } from './views';
 import { liteLabel, liteOn, liteWhy } from './lite';
 import { MENU_LINES } from './lore';
-import { freePack } from './packs';
+import { freePack, openForced } from './packs';
+import { GLITCH_STYLES, REVEAL_STYLES, getGlitchId, getRevealId, setGlitchId, setRevealId, type GlitchId, type RevealId } from './reveal';
 import { previewPlay } from './play';
 import { checkLabPass, gateHTML, labOpen, unlockLab } from './gate';
 
@@ -95,6 +96,27 @@ function report(r: Report): string {
     <table><thead><tr><th class="left">Court</th><th>Starters</th><th>Strong squad</th></tr></thead><tbody>${r.stages.map((s) => `<tr><td class="left">${esc(s.name)}</td><td>${s.starter}%</td><td>${s.strong}%</td></tr>`).join('')}</tbody></table></section>`;
 }
 let gateErr = '';
+/** Reveal & glitch gallery: which tier the Preview buttons open, and the saved defaults the real pack opening uses. */
+let rvTier = 'epic';
+const RV_TIERS: [string, string][] = [['common', 'Common'], ['epic', 'Epic'], ['legendary', 'Legendary'], ['iconic', 'Iconic'], ['holo', 'Iconic HOLO']];
+function revealGallery(): string {
+  const ds = getRevealId(), dg = getGlitchId();
+  const row = (kind: 'rs' | 'gv', id: string, name: string, blurb: string, isDef: boolean): string => `<div class="rv-row${isDef ? ' on' : ''}"><div><b>${esc(name)}</b>${isDef ? ' <i class="rv-def">DEFAULT</i>' : ''}<small class="dim">${esc(blurb)}</small></div>
+    <div class="row"><button class="btn sm go" data-a="rv-play" data-v="${kind}:${id}">Play / Preview</button><button class="btn sm" data-a="rv-def" data-v="${kind}:${id}" ${isDef ? 'disabled' : ''}>Use as default</button></div></div>`;
+  return `<section class="panel"><h2 class="h">Reveal &amp; glitch variants</h2>
+    <p class="dim small">Compare the big versions of the pack opening and the glitch looks, then pick the default the real opening uses (saved in this browser). A preview opens a real pack with the card below, so it also adds that card to your collection.</p>
+    <div class="row"><span class="dim small">Preview card</span>${RV_TIERS.map(([k, n]) => `<button class="chipbtn${rvTier === k ? ' on' : ''}" data-a="rv-tier" data-v="${k}">${n}</button>`).join('')}</div>
+    <h3 class="small">Opening style</h3>
+    ${(Object.keys(REVEAL_STYLES) as RevealId[]).map((id) => row('rs', id, REVEAL_STYLES[id].name, REVEAL_STYLES[id].blurb, ds === id)).join('')}
+    <h3 class="small">Glitch (sealed pack, face-down and face-up HOLO / Iconic)</h3>
+    <p class="dim small">A glitch preview always opens an Iconic (HOLO unless you chose a plain Iconic).</p>
+    ${(Object.keys(GLITCH_STYLES) as GlitchId[]).map((id) => row('gv', id, GLITCH_STYLES[id].name, GLITCH_STYLES[id].blurb, dg === id)).join('')}</section>`;
+}
+function rvPreview(kind: string, id: string): void {
+  const glitch = kind === 'gv', t = glitch && rvTier !== 'iconic' && rvTier !== 'holo' ? 'holo' : rvTier;
+  const tier = (t === 'holo' ? 'iconic' : t) as 'common', pick = { kind: t === 'common' ? 'play' as const : 'baller' as const, tier, holo: t === 'holo' };
+  openForced([{ kind: 'play', tier: 'common' }, pick], glitch ? { glitch: id as GlitchId } : { style: id as RevealId });
+}
 export function labHTML(): string {
   if (!labOpen()) return gateHTML(gateErr);
   const P = profile();
@@ -121,6 +143,7 @@ export function labHTML(): string {
       <label class="btn sm file-btn">Choose file<input type="file" id="music-file-${c}" accept="audio/*"></label>
       <button class="btn sm" data-a="mus-clear" data-v="${c}" ${musicFileName(c) ? '' : 'disabled'}>Built-in</button>
       <button class="btn sm" data-a="mus-test" data-v="${c}">${musicTest() === c ? 'Stop test' : 'Play test'}</button></div>`).join('')}</section>
+  ${revealGallery()}
   <section class="panel"><h2 class="h">Dev tools</h2>
     <div class="row"><button class="btn" data-a="tutorial">Replay tutorial</button>
     <button class="btn" data-a="dev-bucks">+500 Bucks</button>
@@ -180,6 +203,9 @@ export function labAct(a: string, v: string | undefined): boolean {
     case 'dev-bucks': addBucks(500); onChange(); return true;
     case 'dev-shards': profile().shards += 500; save(); onChange(); return true;
     case 'dev-v2': { const P = profile(); P.v2 = P.v2 || {}; for (const c of allCards()) if (c.v2) P.v2[c.k] = c.rarity === 'iconic' ? 1 : 2; save(); onChange(); return true; }
+    case 'rv-tier': rvTier = v!; onChange(); return true;
+    case 'rv-play': { const [k, id] = v!.split(':'); rvPreview(k, id); return true; }
+    case 'rv-def': { const [k, id] = v!.split(':'); if (k === 'rs') setRevealId(id as RevealId); else setGlitchId(id as GlitchId); onChange(); return true; }
     case 'dev-iconic': freePack('icon', true); return true;
     case 'lab-prev': previewPlay(v!); return true;
     case 'lab-fast': setFast(!profile().fast); setSpeed(profile().fast ? 0.45 : 1); onChange(); return true;

@@ -53,3 +53,24 @@ export const GLITCH_LORE: Record<string, { sub: string; alias?: string }> = {
 };
 
 export const pick = <T,>(arr: T[], seed = Date.now()): T => arr[Math.abs(Math.floor(seed)) % arr.length];
+
+/** One line of lore on the back of a card, picked by card number. Short: it has to fit the frame. */
+export const BACK_LORE = {
+  baller: [
+    'Rendered, not born. The Grid keeps his shot on file.',
+    'Every Baller carries a number. This one answers to it.',
+    'The mint made him once. The Grid prints him again.',
+    'Look above the hair. Something gray is still there.',
+    'He learned the court by being drawn onto it.',
+    'One frame at a time, he became a starter.',
+    'A shot like that was never in the render queue.',
+    'The Grid remembers every make and every miss.',
+  ],
+  sneaker: [
+    'Printed in one render pass, laced in the next.',
+    'Some pairs jump higher than the code allows.',
+    'The Grid cannot tell where the shoe ends and the player starts.',
+    'Worn on court, saved off-chain.',
+    'Each pair has a drip number. Nobody knows who counts them.',
+  ],
+};

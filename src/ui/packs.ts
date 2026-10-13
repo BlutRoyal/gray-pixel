@@ -7,11 +7,13 @@ import { sfx } from './sfx';
 import { setMusicOverride } from './music';
 import { ballerTier } from '../rules';
 import { liteOn } from './lite';
-import { glideFrames, packTease, preFlip, turnClass } from './reveal';
+import { GLITCH_STYLES, REVEAL_STYLES, getGlitchId, getRevealId, glideFrames, packTease, preFlip, styled, turnClass, type GlitchId, type RevealId, type RevealStyle } from './reveal';
 import { labOpen } from './gate';
 import { PACK_LINES } from './lore';
 import { strayHTML } from './wordmark';
-import { ballerCardHTML, bindTilt, esc, fitCards, playCardHTML, reduced, sneakerCardHTML } from './views';
+import { ballerCardHTML, ballerFromId, bindTilt, esc, fitCards, playCardHTML, reduced, sneakerCardHTML } from './views';
+import { sneakerRow } from '../rules';
+import { ccard } from '../casual/cards';
 import { levelOf } from '../casual/progress';
 
 let onChange: () => void = () => {};
@@ -22,7 +24,7 @@ export function initPacks(changed: () => void): void {
     // keyboard: the same as a tap (skip ahead), or SEE SUMMARY once the last card is up.
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); if (OP.final) showSummary(); else tap(); }
   });
-  (window as unknown as { __gpOpen?: unknown }).__gpOpen = (specs: ForcedPull[]): boolean => { if (!labOpen()) return false; openForced(specs); return true; };
+  (window as unknown as { __gpOpen?: unknown }).__gpOpen = (specs: ForcedPull[], look?: OpenLook): boolean => { if (!labOpen()) return false; openForced(specs, look); return true; };
   window.setInterval(() => { const el = document.getElementById('dailyT'); if (el) el.textContent = dailyTimer(); }, 30000);
 }
 /** Time until the free daily pack unlocks again (local midnight), e.g. "7h 12m". */
@@ -93,12 +95,18 @@ export function packsHTML(): string {
 interface Opening {
   def: PackDef; pulls: Pull[]; isNew: boolean[]; i: number; mode: 'pack' | 'card' | 'sum'; step: 'drop' | 'wait' | 'build' | 'flip' | 'shown'; busy: boolean; shards: number; cardShards: number;
   anim: Animation | null; timers: number[]; final: boolean; tapped: boolean; pile: string[];
+  /** the opening style and glitch variant of this opening (the saved default, or what the Lab gallery previews) */
+  st: RevealStyle; gv: GlitchId;
 }
+/** Lab / test hook: preview with a style and glitch variant other than the saved default. */
+export interface OpenLook { style?: RevealId; glitch?: GlitchId }
+let look: OpenLook = {};
+const ocls = (): string => `overlay opening rs-${OP!.st.id} gv-${OP!.gv}`;
 let OP: Opening | null = null;
 export { preFlip, packTease, glideFrames };
 const isHoloIconic = (p: Pull): boolean => p.holo && p.tier === 'iconic';
-const hintSparks = (p: Pull): string => {
-  const n = Math.round(preFlip(p).sparks / (liteOn() ? 2 : 1));
+const hintSparks = (p: Pull, st: RevealStyle): string => {
+  const n = Math.round(styled(preFlip(p), st).sparks / (liteOn() ? 2 : 1));
   return Array.from({ length: n }, (_x, k) => `<i style="--a:${Math.round((360 / n) * k + 12)}deg;--d:${(k % 5) * 0.37}s"></i>`).join('');
 };
 
@@ -120,6 +128,8 @@ export function openPending(): void {
   if (id) { save(); open(id, true); }
 }
 function begin(def: PackDef, pulls: Pull[], pack = true): void {
+  const st = REVEAL_STYLES[look.style || getRevealId()], gv = look.glitch && look.glitch in GLITCH_STYLES ? look.glitch : getGlitchId();
+  look = {};
   const P = profile();
   let shards = 0, cardShards = 0;
   const isNew = pulls.map((p) => { const r = addPull(p); p.shards = r.shards; p.cardShard = r.card; if (r.card) cardShards += r.shards; else shards += r.shards; return r.isNew; });
@@ -127,7 +137,7 @@ function begin(def: PackDef, pulls: Pull[], pack = true): void {
   save();
   onChange();
   clearTimers();
-  OP = { def, pulls, isNew, i: 0, mode: 'pack', step: 'drop', busy: false, shards, cardShards, anim: null, timers: [], final: false, tapped: false, pile: [] };
+  OP = { def, pulls, isNew, i: 0, mode: 'pack', step: 'drop', busy: false, shards, cardShards, anim: null, timers: [], final: false, tapped: false, pile: [], st, gv };
   if (pack) showPack();
 }
 function open(id: string, free: boolean, forceIconic = false): void {
@@ -142,7 +152,8 @@ function open(id: string, free: boolean, forceIconic = false): void {
 }
 /** Lab / test hook: opens a pack with exactly these pulls (window.__gpOpen, only when the Lab is unlocked). */
 export interface ForcedPull { kind?: 'baller' | 'sneaker' | 'play'; tier: Tier; holo?: boolean; /** a specific Baller id */ id?: number }
-export function openForced(specs: ForcedPull[]): void {
+export function openForced(specs: ForcedPull[], lk?: OpenLook): void {
+  look = lk || {};
   const pulls = specs.map((s) => { const p = pullOne(s.kind || (tierRank(s.tier) >= 3 ? 'baller' : 'play'), s.tier); if (s.id != null && p.kind === 'baller') { p.id = s.id; p.key = 'b:' + s.id; }
     p.holo = !!s.holo && s.tier === 'iconic' && p.kind === 'baller'; return p; });
   setMusicOverride(profile().music ? 'pack' : 'none');
@@ -160,7 +171,7 @@ function overlayEl(): HTMLElement {
   if (!o) {
     o = document.createElement('div');
     o.id = 'opening';
-    o.className = 'overlay opening';
+    o.className = ocls();
     o.setAttribute('role', 'dialog');
     o.setAttribute('aria-modal', 'true');
     o.setAttribute('aria-label', 'Opening a pack');
@@ -174,7 +185,7 @@ function overlayEl(): HTMLElement {
 function showPack(): void {
   const o = overlayEl(), op = OP!;
   delete o.dataset.a;
-  o.className = 'overlay opening';
+  o.className = ocls();
   const tease = packTease(op.pulls), holo = tease.kind === 'holo';
   const art = packArt(op.def, true);
   const cls = holo ? ' glitch tease-holo' : tease.kind === 'iconic' ? ' tease-iconic' : tease.kind === 'epic+' ? ' tease-shake' : '';
@@ -206,7 +217,7 @@ function rip(): void {
     sfx('packRip', { rank });
     if (rank >= 2) sfx('packCharge', { ms: wait - 200, rank, i: 0 });
   }
-  if (tease.kind !== 'none' && rank >= 4 && !reduced()) o.classList.add('rays', tease.kind === 'epic+' ? 'rays-epicplus' : 'rays-iconic');
+  if (op.st.rays && tease.kind !== 'none' && rank >= 4 && !reduced()) o.classList.add('rays', tease.kind === 'epic+' ? 'rays-epicplus' : 'rays-iconic');
   const hint = o.querySelector('.op-hint');
   if (hint) hint.textContent = PACK_LINES.rendering[rank % PACK_LINES.rendering.length];
   const done = () => { op.busy = false; o.classList.remove('rays', 'rays-epicplus', 'rays-iconic', 'tear', 'holo-pack'); showCards(); };
@@ -214,11 +225,11 @@ function rip(): void {
 }
 const bestPull = (op: Opening): Pull => op.pulls.reduce((m, p) => (preFlip(p).sfxRank + (p.holo ? 0.5 : 0) > preFlip(m).sfxRank + (m.holo ? 0.5 : 0) ? p : m), op.pulls[0]);
 function stageHTML(op: Opening): string {
-  const i = op.i, p = op.pulls[i], n = op.pulls.length, pre = preFlip(p);
+  const i = op.i, p = op.pulls[i], n = op.pulls.length, pre = styled(preFlip(p), op.st);
   return `<div class="op-stage solo auto">
     <div class="op-top"><span class="op-count">Card <b>${i + 1}</b> of ${n}</span><span class="op-dots" aria-hidden="true">${op.pulls.map((_x, k) => `<i class="${k < i ? 'done' : k === i ? 'now' : ''}"></i>`).join('')}</span><button class="btn sm" data-a="opskip">Skip all</button></div>
     <div class="op-slot"><div class="flip solo ${pre.cls}${pre.faceGlitch === 2 ? ' glitching' : ''}" id="opCard" data-a="optap" role="button" tabindex="0" style="--hint:${pre.glow};--flipms:${pre.turnMs}ms;--bms:${pre.buildMs}ms;--sh:${pre.shake}" aria-label="Card ${i + 1} of ${n}, face down. Tap to skip ahead.">
-      <span class="hint-sparks" aria-hidden="true">${hintSparks(p)}</span>
+      <span class="hint-sparks" aria-hidden="true">${hintSparks(p, op.st)}</span>
       <span class="flip-in"><span class="back"><span class="back-logo">G${strayHTML('back-stray')}</span><span class="back-ring"></span><span class="back-tear"></span><span class="back-leak"></span></span><span class="front">${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</span></span>${p.holo ? FOIL : ''}</div></div>
     <p class="op-hint" id="opHint">&nbsp;</p><div class="op-pile" id="opPile">${op.pile.join('')}</div>
     <button class="btn op-next" id="opNextBtn" data-a="opnext" disabled>Opening...</button></div>`;
@@ -236,7 +247,7 @@ function dealCard(): void {
   const op = OP!, o = overlayEl();
   op.mode = 'card'; op.step = 'drop'; op.busy = false; op.tapped = false;
   delete o.dataset.a;
-  o.className = 'overlay opening';
+  o.className = ocls();
   o.innerHTML = stageHTML(op);
   const el = o.querySelector<HTMLElement>('#opCard')!;
   const hint = o.querySelector('#opHint')!;
@@ -269,17 +280,18 @@ function flip(): void {
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
   el.classList.remove('waiting');
-  const pre = preFlip(p), hint = o.querySelector('#opHint');
+  const pre = styled(preFlip(p), op.st), hint = o.querySelector('#opHint');
   if (pre.buildMs <= 0 || reduced()) { turn(); return; }
   op.step = 'build';
   el.classList.add('building');
-  if (hint) hint.textContent = 'Something huge is compiling...';
+  if (hint) hint.textContent = op.st.id === 'clean' ? 'Compiling...' : 'Something huge is compiling...';
   const ms = liteOn() ? Math.round(pre.buildMs * 0.8) : pre.buildMs;
   el.style.setProperty('--bms', ms + 'ms');
   sfx('venitus', { ms, rank: pre.sfxRank, level: pre.faceGlitch === 2 ? 1 : 0 });
   // heartbeat: faster and faster, each beat also pulses the card
   let at = 450, gap = 820;
-  while (at < ms - 500) { const a = at; later(() => { sfx('heartbeat', { v: 1.15 }); el.classList.add('beat'); window.setTimeout(() => el.classList.remove('beat'), 150); }, a); at += gap; gap = Math.max(300, gap * 0.87); }
+  if (!pre.leak) el.classList.add('no-leak');
+  while (pre.heart && at < ms - 500) { const a = at; later(() => { sfx('heartbeat', { v: 1.15 }); el.classList.add('beat'); window.setTimeout(() => el.classList.remove('beat'), 150); }, a); at += gap; gap = Math.max(300, gap * 0.87); }
   later(() => el.classList.add('flare'), ms - 380);
   later(turn, ms);
 }
@@ -290,7 +302,7 @@ function turn(): void {
   op.step = 'flip';
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
-  const pre = preFlip(p), ms = reduced() ? 0 : pre.turnMs;
+  const pre = styled(preFlip(p), op.st), ms = reduced() ? 0 : pre.turnMs;
   el.classList.remove('waiting', 'building', 'flare', 'beat', 'h-epicplus', 't-common');
   el.classList.add(turnClass(p.tier), 'flipping', 'flipped');
   el.style.setProperty('--flipms', ms + 'ms');
@@ -314,9 +326,9 @@ function reveal(): void {
   el.classList.add('shown');
   if (isHoloIconic(p) && !reduced()) { el.classList.add('hglitch'); later(() => el.classList.remove('hglitch'), 1400); }
   el.setAttribute('aria-label', `${TIER_NAME[p.tier]}${p.holo ? ' HOLO' : ''} card. Tilts when touched.`);
-  const rank = tierRank(p.tier);
-  if (rank >= 3) burst(el, p.tier, isHoloIconic(p)); // Common, Uncommon and Rare: a clean flip, no burst or flash
-  if (rank >= 4) rain(p.tier, isHoloIconic(p));
+  const rank = tierRank(p.tier), st = op.st;
+  if (rank >= st.burstFrom) burst(el, p, isHoloIconic(p), st); // Common, Uncommon and Rare (clean): a plain flip, no burst or flash
+  if (!reduced() && !liteOn() && (st.rain === 'epic' ? rank >= 4 : st.rain === 'iconic' && rank >= 5)) rain(p.tier, isHoloIconic(p));
   const prevMax = op.pulls.slice(0, op.i).reduce((m, q) => Math.max(m, tierRank(q.tier)), -1);
   const newBest = op.i > 0 && rank > prevMax && rank >= 3;
   // a hit of its own per tier (Epic and Legendary only part ways here)
@@ -325,7 +337,7 @@ function reveal(): void {
   if (isHoloIconic(p)) setTimeout(() => sfx('glitch3'), 450);
   const last = op.i === op.pulls.length - 1;
   const hint = o.querySelector('#opHint');
-  if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''}`;
+  if (hint) hint.innerHTML = shownHint(p, newBest, p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : '');
   if (newBest && !reduced()) { el.classList.add('newbest'); later(() => el.classList.remove('newbest'), 1400); }
   if (last) {
     // the last card stays up front (it tilts like any card) above the pile until SEE SUMMARY is tapped
@@ -335,7 +347,7 @@ function reveal(): void {
     return;
   }
   nextBtn('Opening...', false);
-  later(settle, (reduced() ? 400 : 1300) + rank * 220 + (p.holo ? 700 : 0));
+  later(settle, reduced() ? 400 : st.steady ? 1250 + (rank >= 3 ? 450 : 0) + (rank >= 5 ? 600 : 0) : 1300 + rank * 220 + (p.holo ? 700 : 0));
 }
 /** The opened card goes onto the fanned pile (slightly tilted and skewed), then the next one glides in. */
 function pileHTML(op: Opening, k: number, fresh: boolean): string {
@@ -375,7 +387,7 @@ function skipToEnd(): void {
   op.pile = op.pulls.slice(0, -1).map((_p, k) => pileHTML(op, k, false));
   const o = overlayEl();
   op.step = 'drop'; op.tapped = false; op.final = false;
-  o.className = 'overlay opening';
+  o.className = ocls();
   o.innerHTML = stageHTML(op);
   const el = o.querySelector<HTMLElement>('#opCard')!, p = op.pulls[op.i];
   el.classList.remove('t-common', 'h-epicplus');
@@ -384,7 +396,7 @@ function skipToEnd(): void {
   el.style.setProperty('--flipms', '0ms');
   op.step = 'shown'; op.final = true; el.classList.add('final');
   const hint = o.querySelector('#opHint');
-  if (hint) hint.textContent = `${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''} · all opened`;
+  if (hint) hint.innerHTML = shownHint(p, false, (p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : '') + ' · all opened');
   nextBtn('SEE SUMMARY', true);
   fitCards(o);
 }
@@ -392,7 +404,7 @@ function showSummary(): void {
   const op = OP!, o = overlayEl();
   clearTimers();
   op.mode = 'sum'; op.final = false;
-  o.className = 'overlay opening';
+  o.className = ocls();
   const ic = op.pulls.find((p) => p.tier === 'iconic'), holoIc = op.pulls.some(isHoloIconic);
   if (ic) { sfx('triumphHit', { rank: holoIc ? 1 : 0 }); setMusicOverride(profile().music ? 'triumph' : 'none', holoIc ? 1 : 0.55); }
   else sfx('summary');
@@ -426,39 +438,59 @@ function rain(tier: Tier, holo = false): void {
     setTimeout(() => d.remove(), 3000);
   }
 }
-function burst(el: HTMLElement, tier: Tier, holo = false): void {
+/** The name on the card, for the hint line and the banner. */
+function pullName(p: Pull): string {
+  try {
+    if (p.kind === 'baller') return 'Baller ' + ballerFromId(p.id as number).name;
+    if (p.kind === 'sneaker') return 'Sneaker #' + (sneakerRow(p.id as number)?.[0] ?? p.id);
+    return ccard(p.id as string)?.name ?? '';
+  } catch { return ''; }
+}
+/** Under the card after the turn: the tier in its own colour, then the name and tags. */
+function shownHint(p: Pull, newBest: boolean, tail: string): string {
+  return `${newBest ? '<i class="rv-best">NEW BEST PULL</i>' : ''}<b class="rv-tier rv-${p.tier}">${esc(TIER_NAME[p.tier].toUpperCase())}${p.holo ? ' · HOLO' : ''}</b><span class="rv-name">${esc(pullName(p))}${esc(tail)}</span>`;
+}
+const gone = (el: Element, ms: number): void => { setTimeout(() => el.remove(), ms); };
+/** What the flip shows, by style: Epic a tier-colour glow, Legendary a gold light sweep and a name banner (the clean look), the old sparks, flash and
+ *  big word (classic, cinematic), Iconic a dark flash with a gold burst. Screen shake and particles only where the style says so. */
+function burst(el: HTMLElement, p: Pull, holo: boolean, st: RevealStyle): void {
   if (reduced()) return;
-  const n = Math.round((tier === 'iconic' ? 60 : tier === 'legendary' ? 44 : tier === 'epic' ? 20 : 12) / (liteOn() ? 3 : 1));
+  const tier = p.tier, rank = tierRank(tier);
   const r = el.getBoundingClientRect();
-  for (let i = 0; i < n; i++) {
-    const d = document.createElement('i');
-    d.className = 'spark t-' + tier + (tier === 'iconic' && !holo ? ' gold' : '');
-    const a = (Math.PI * 2 * i) / n + rnd() * 0.4, dist = 90 + rnd() * (tier === 'legendary' || tier === 'iconic' ? 160 : 100);
-    d.style.left = r.left + r.width / 2 + 'px';
-    d.style.top = r.top + r.height / 2 + 'px';
-    d.style.setProperty('--dx', Math.cos(a) * dist + 'px');
-    d.style.setProperty('--dy', Math.sin(a) * dist + 'px');
-    document.body.appendChild(d);
-    setTimeout(() => d.remove(), 900);
+  if (st.burst === 'full' || rank >= 5) {
+    const n = Math.round((tier === 'iconic' ? 60 : tier === 'legendary' ? 44 : tier === 'epic' ? 20 : 12) / (liteOn() ? 3 : 1));
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('i');
+      d.className = 'spark t-' + tier + (tier === 'iconic' && !holo ? ' gold' : '');
+      const a = (Math.PI * 2 * i) / n + rnd() * 0.4, dist = 90 + rnd() * (tier === 'legendary' || tier === 'iconic' ? 160 : 100);
+      d.style.left = r.left + r.width / 2 + 'px';
+      d.style.top = r.top + r.height / 2 + 'px';
+      d.style.setProperty('--dx', Math.cos(a) * dist + 'px');
+      d.style.setProperty('--dy', Math.sin(a) * dist + 'px');
+      document.body.appendChild(d);
+      gone(d, 900);
+    }
   }
+  const add = (cls: string, html: string, ms: number): void => { const w = document.createElement('div'); w.className = cls; w.innerHTML = html; document.body.appendChild(w); gone(w, ms); };
   if (tier === 'epic') {
-    const f = document.createElement('div');
-    f.className = 'flash t-epic small';
-    document.body.appendChild(f);
-    setTimeout(() => f.remove(), 600);
+    if (st.epicFx === 'glow') { el.classList.add('fx-glow'); setTimeout(() => el.classList.remove('fx-glow'), 1500); }
+    else add('flash t-epic small', '', 600);
   }
-  if (tier === 'legendary' || tier === 'iconic') {
-    const w = document.createElement('div');
-    w.className = 'walkout t-' + tier + (tier === 'iconic' ? (holo ? ' holo' : ' gold') : '');
-    w.innerHTML = holo ? `<b class="gl-title-b" data-text="HOLO">HOLO</b><small>ICONIC</small>` : `<b>${TIER_NAME[tier].toUpperCase()}</b>`;
-    document.body.appendChild(w);
-    setTimeout(() => w.remove(), tier === 'iconic' ? 2200 : 1500);
-    const f = document.createElement('div');
-    f.className = 'flash t-' + tier + (tier === 'iconic' ? (holo ? ' holo' : ' gold') : '');
-    document.body.appendChild(f);
-    setTimeout(() => f.remove(), 700);
-    document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake');
+  if (tier === 'legendary') {
+    if (st.legendaryFx === 'sweep') {
+      el.classList.add('fx-lsweep'); setTimeout(() => el.classList.remove('fx-lsweep'), 1900);
+      add('lsweep', '<i class="ls-flare"></i><i class="ls-beam"></i>', 1700);
+      add('rbanner t-legendary', `<b>LEGENDARY</b><small>${esc(pullName(p))}</small>`, 2300);
+    } else {
+      add('walkout t-legendary', `<b>${TIER_NAME[tier].toUpperCase()}</b>`, 1500);
+      add('flash t-legendary', '', 700);
+    }
   }
+  if (tier === 'iconic') {
+    add('walkout t-iconic' + (holo ? ' holo' : ' gold'), holo ? `<b class="gl-title-b" data-text="HOLO">HOLO</b><small>ICONIC</small>` : `<b>${TIER_NAME[tier].toUpperCase()}</b>`, 2200);
+    add('flash t-iconic' + (holo ? ' holo' : ' gold') + (st.id === 'clean' ? ' dark' : ''), '', st.id === 'clean' ? 1000 : 700);
+  }
+  if ((st.quake === 'legendary' && rank >= 4) || (st.quake === 'iconic' && rank >= 5)) { document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake'); }
 }
 export function packsAct(a: string, v: string | undefined): boolean {
   switch (a) {

@@ -32,6 +32,7 @@ import './ballerz.css';
 import { LOGO_EMBLEM } from './ui/logo';
 import './sound.css';
 import './round3.css';
+import './round6.css';
 
 loadCatalog(catalogData as Catalog);
 migrateHolo();

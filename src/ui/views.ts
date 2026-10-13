@@ -6,9 +6,9 @@ import {
 } from '../rules';
 import { avatar, teamHue } from './avatar';
 import { cardArt, isTrapCard } from './cardart';
-import { RARITY_NAME, ccard, classLabel, whenLabel, type CCard } from '../casual/cards';
+import { RARITY_NAME, ccard, classLabel, effectTag, whenLabel, type CCard } from '../casual/cards';
 import { cBaller } from '../casual/engine';
-import { specialText } from '../casual/specials';
+import { POS_NAME, shoeOf } from '../casual/skills';
 import { cardTier } from '../casual/packs';
 
 export const esc = (s: unknown): string => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -63,7 +63,7 @@ const STAT_NAME: Record<string, string> = { D: 'Dunk', P: 'Playmaking', S: 'Shoo
 export function ballerFromId(id: number): BallerCard {
   return makeBaller(ballerRow(id)!, [0, 0, 0, 0, 0, 0]);
 }
-function statCells(c: BallerCard, withJ: boolean): string {
+export function statCells(c: BallerCard, withJ: boolean): string {
   return (['D', 'S', 'P', 'F', 'J'] as const).map((k) => {
     const v = k === 'J' && !withJ ? null : c.st[k];
     const cls = v == null ? 'na' : v >= 95 ? 'elite' : v >= 90 ? 'hi' : v < 70 ? 'lo' : '';
@@ -80,48 +80,50 @@ export interface CardOpts {
   level?: number;
 }
 // An Iconic card keeps its top frame, but only the HOLO Iconic Baller glitches (continuously).
-const wrap = (kind: string, tier: Tier, o: CardOpts, inner: string, label: string): string => {
+export const wrap = (kind: string, tier: Tier, o: CardOpts, inner: string, label: string, ck = ''): string => {
   const gl = !!o.holo && tier === 'iconic' && kind.startsWith('bcard');
-  return `<div class="card ${kind} t-${tier}${o.holo ? ' holo' : ''}${o.small ? ' sm' : ''}${gl ? ' ic-gl' : ''}" data-tilt role="img" aria-label="${esc(label)}${o.holo ? ', HOLO' : ''}">
+  return `<div class="card ${kind} t-${tier}${o.holo ? ' holo' : ''}${o.small ? ' sm' : ''}${gl ? ' ic-gl' : ''}" data-tilt data-ck="${ck}" data-lv="${o.level || 1}" role="img" aria-label="${esc(label)}${o.holo ? ', HOLO' : ''}">
     <div class="cface">${inner}</div><div class="sheen"></div>${tier === 'iconic' && !kind.startsWith('scard') ? '<i class="stray ic-stray" aria-hidden="true"></i>' : ''}${o.holo ? '<span class="holob">HOLO</span>' : ''}${gl ? '<i class="glbar" aria-hidden="true"></i>' : ''}
     ${o.count && o.count > 1 ? `<span class="cnt">×${o.count}</span>` : ''}${o.isNew ? '<span class="newb">NEW</span>' : ''}
   </div>`;
 };
 
+/** The front of a Baller: portrait, #number, tier and the four numbers the game uses. Everything else is on the back (cardback.ts). */
 export function ballerCardHTML(id: number, o: CardOpts = {}): string {
   const c = ballerFromId(id), tier = ballerTier(id), r = cBaller(id, null, o.level || 1, !!o.holo), lv = o.level || 1;
   return wrap('bcard', tier, o, `
-    <div class="ctop"><span class="cls-tag">${CLASS_SHORT[c.cls]}</span><span class="tier-tag">${TIER_NAME[tier]}${lv > 1 ? ` · Lv ${lv}` : ''}</span></div>
+    <div class="ctop"><span class="cls-tag">${POS_NAME[r.pos].toUpperCase()}</span><span class="tier-tag">${TIER_NAME[tier]}${lv > 1 ? ` · Lv ${lv}` : ''}</span></div>
     <div class="cart" style="--hue:${teamHue(c.team)}">${ballerImg(c)}</div>
     <div class="cname"><b>Baller ${esc(c.name)}</b><small>${esc(c.team)}</small></div>
-    <div class="cstats">${statCells(c, false)}</div>
-    <div class="ctrait cgame-line"><span>${r.pos}</span><span>RIM <b>${r.rim}</b></span><span>MID <b>${r.mid}</b></span><span>3PT <b>${r.three}</b></span><span>DEF <b>${r.def}</b></span></div>
-    ${r.skill.key === 'none' ? '' : `<div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>`}${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))} <i class="ic-b">Iconic +${TUNING.iconicBoost}% all shots.</i></div>` : ''}`,
-  `Baller ${c.name}, ${TIER_NAME[tier]}`);
+    <div class="cgame"><div><span>RIM</span><b>${r.rim}</b></div><div><span>MID</span><b>${r.mid}</b></div><div><span>3PT</span><b>${r.three}</b></div><div><span>DEF</span><b>${r.def}</b></div></div>`,
+  `Baller ${c.name}, ${TIER_NAME[tier]}`, 'b:' + id);
 }
 
 export function sneakerCardHTML(id: number, o: CardOpts = {}): string {
   const s = sneakerRow(id)!, D = catalog();
   const tier = sneakerRowTier(s);
-  const enh = s[2] ? ENH_NAME[s[2]] : '';
+  const sh = shoeOf(s);
   return wrap('scard', tier, o, `
     <div class="ctop"><span class="cls-tag">SNEAKER</span><span class="tier-tag">${esc(D.rar[s[3]])}</span></div>
     <div class="cart sneaker-art"><span class="pwrap swrap"><img class="pimg" src="${sneakerImgUrl(s[0])}" data-fb="1" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">${sneakerSVG(s[3])}</span><div class="jump"><small>JUMP</small><b>${s[1]}</b></div></div>
-    <div class="cname"><b>Sneaker #${s[0]}</b><small>${esc(D.des[s[4]] || 'Sneaker')}, drip ${s[5]}</small></div>
-    <div class="ctrait">Rarity adds accuracy to every shot, Jump adds up to +8% at the Rim.${enh ? ` <span class="dim">${esc(enh)}</span>` : ''}</div>`,
-  `Sneaker ${s[0]}, ${D.rar[s[3]]}`);
+    <div class="cname"><b>Sneaker #${s[0]}</b></div>
+    <div class="cgame one"><div><span>EVERY SHOT</span><b>+${sh ? sh.bonus : 0}%</b></div></div>`,
+  `Sneaker ${s[0]}, ${D.rar[s[3]]}`, 's:' + id);
 }
 
-/** Face of a casual Play card: cost, name, type line, effect and flavour. */
+/** Face of a casual Play card: cost, name, type line, effect and flavour (used in the game hand and the deck). */
 export function ccardFace(c: CCard, cost = c.cost): string {
   return `<span class="pcost" title="Momentum cost">${c.fx.allIn ? 'ALL' : cost}</span><b class="pname">${esc(c.name)}</b><span class="ptype">${esc(RARITY_NAME[c.rarity])} · ${esc(classLabel(c))} · ${esc(whenLabel(c))}</span><span class="ptext">${esc(c.text)}</span><span class="pflav">${esc(c.flavor)}</span>`;
 }
+/** Collectible front of a Play card: art, name, cost and a short effect. Rules text and flavour are on the back. */
 export function playCardHTML(key: string, o: CardOpts = {}): string {
   const cc = ccard(key)!, tier = cardTier(cc);
-  const trap = isTrapCard(cc);
+  const trap = isTrapCard(cc), tag = effectTag(cc);
   return wrap(`pcard ${trap ? 'sp-trap' : 'sp-spell'}${cc.cls ? ' pc-' + cc.cls : ''}`, tier, o,
     `<div class="ctop"><span class="cls-tag">${cc.cls ? CLASS_SHORT[cc.cls] : 'NEUTRAL'}</span><span class="tier-tag">${RARITY_NAME[cc.rarity]}</span></div>
-    <div class="pc-art">${cardArt(cc)}<span class="pc-kind">${trap ? 'TRAP' : 'SPELL'}</span></div><div class="pbody">${ccardFace(cc)}</div>`, `${cc.name}, ${trap ? 'trap' : 'spell'}, ${RARITY_NAME[cc.rarity]}`);
+    <div class="pc-art">${cardArt(cc)}<span class="pc-kind">${trap ? 'TRAP' : 'SPELL'}</span></div>
+    <div class="pbody"><span class="pcost" title="Momentum cost">${cc.fx.allIn ? 'ALL' : cc.cost}</span><b class="pname">${esc(cc.name)}</b>
+      <span class="pfx"><b>${esc(tag.big)}</b> <small>${esc(tag.small)}</small></span><span class="ptext">${esc(cc.text)}</span></div>`, `${cc.name}, ${trap ? 'trap' : 'spell'}, ${RARITY_NAME[cc.rarity]}`, 'p:' + key);
 }
 
 export function sneakerSVG(rarI: number): string {
@@ -159,14 +161,14 @@ export function bindTilt(root: HTMLElement): void {
 }
 
 /** Makes sure every card's text fits inside it: the special text first shrinks (down to 7px), then the duplicate Rim/Mid/3PT line goes. The card art keeps a minimum share (CSS). Call after any render that has cards. */
-const FIT_TXT = '.ctrait, .csp, .ptext, .pflav, .ptype, .pname, .cname small';
+const FIT_TXT = '.ctrait, .csp, .ptext, .pflav, .ptype, .pname, .cname small, .bk-t, .bk-sm';
 /** Fits every text block of every card inside its frame, at any card size: shrink the copy first (down to about 65%), then drop the
  *  least important blocks one by one (flavour, game line, special text, trait text), and last of all clamp the effect text with an ellipsis. */
 export function fitCards(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('.card .cface').forEach((face) => {
     if (face.clientHeight === 0 || face.offsetParent === null) return;
     const txt = Array.from(face.querySelectorAll<HTMLElement>(FIT_TXT));
-    const hideable = ['.pflav', '.cgame-line', '.csp', '.ctrait:not(.csp):not(.cgame-line)', '.ptype', '.cname small', '.cstats'];
+    const hideable = ['.bk-lore', '.pflav', '.cgame-line', '.csp', '.ctrait:not(.csp):not(.cgame-line)', '.ptype', '.cname small', '.cstats'];
     hideable.forEach((q) => face.querySelectorAll<HTMLElement>(q).forEach((e) => e.style.removeProperty('display')));
     txt.forEach((e) => { e.style.fontSize = ''; e.style.removeProperty('-webkit-line-clamp'); e.style.removeProperty('max-height'); });
     const tops = Array.from(face.querySelectorAll<HTMLElement>('.ctop, .cname b, .cname small, .pname'));

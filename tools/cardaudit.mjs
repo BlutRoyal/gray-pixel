@@ -52,10 +52,22 @@ for (const vp of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
     // scroll through so lazy content renders
     for (let y = 0; y < 30; y++) { await page.evaluate((y) => window.scrollTo(0, y * 700), y); await page.waitForTimeout(40); }
     await check(page, l + '-all', vp);
-    await page.evaluate(() => document.querySelector('.card-grid .card')?.click());
-    await page.waitForTimeout(400);
-    await check(page, 'inspect', vp);
-    if (prefix) await page.screenshot({ path: prefix + '-inspect-' + vp.width + '.png' });
+    // close-up of every kind: step through 14 cards, flip each one (the back is audited like the front)
+    for (const f of ['baller', 'sneaker', 'play']) {
+      await page.evaluate((f) => document.querySelector(`[data-a="cfilter"][data-v="${f}"]`)?.click(), f); await page.waitForTimeout(400);
+      await page.evaluate(() => document.querySelector('.card-grid .card')?.click());
+      await page.waitForTimeout(400);
+      for (let i = 0; i < 14; i++) {
+        await check(page, 'inspect-' + f + '-front', vp);
+        await page.evaluate(() => document.querySelector('.insp-card')?.click()); await page.waitForTimeout(1000);
+        const flipped = await page.evaluate(() => !!document.querySelector('.insp-flip.flipped'));
+        if (!flipped) console.log('NOT FLIPPED', f, i);
+        await check(page, 'inspect-' + f + '-back', vp);
+        if (prefix && i === 0) await page.screenshot({ path: prefix + '-inspect-' + f + '-back-' + vp.width + '.png' });
+        await page.evaluate(() => document.querySelector('[data-inspect="next"]')?.click()); await page.waitForTimeout(150);
+      }
+      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    }
   });
   await run('deck', vp, async (page, l) => {
     await page.evaluate(() => document.querySelector('[data-a="tab"][data-v="deck"]')?.click());
