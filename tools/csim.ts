@@ -1,10 +1,11 @@
 // Balance check for the v2 rules: coach vs coach, zone and usage stats, and a "typical player" against each story stage.
 // npx tsx tools/csim.ts [gamesPerPair]
 import catalogJson from '../src/data/catalog.json';
-import { CLS_KEYS, loadCatalog, seedRng, type Catalog } from '../src/rules';
+import { CLS_KEYS, loadCatalog, rnd, seedRng, type Catalog } from '../src/rules';
+import { ballersOfTier } from '../src/rules';
 import { ZONES, bandTeam, buildDeck, cpuDeck, newSide, simGame, starterIds, equip, cBaller, validateDeck, canAdd, type AiSkill, type CGame, type CSide, type Zone } from '../src/casual/engine';
 import { STAGES, cpuSide } from '../src/casual/story';
-import { importTuning } from '../src/casual/tuning';
+import { importTuning, TUNING as T } from '../src/casual/tuning';
 import { allCards, ccard } from '../src/casual/cards';
 
 loadCatalog(catalogJson as unknown as Catalog);
@@ -70,6 +71,31 @@ function report(a: Agg, title: string): void {
   console.log(`low-chance makes per 100 games: ${Object.entries(a.labels).map(([k, v]) => `${k} ${f1(v / a.games * 100)}`).join(' · ') || 'none'} · INHUMAN (<=1%) ${f1(a.inhuman / a.games * 100)} · On Fire starts per game ${f1(a.fireOn / a.games)}`);
 }
 
+// Specials: every squad swaps one Baller for a random Iconic (20% HOLO), so a special is in play in almost every game.
+// npx tsx tools/csim.ts 60 specials  -> coach vs coach with specials, usage per game; BDL_TUNE='{"spOn":0}' runs the same games with specials off.
+const iconics = ballersOfTier('iconic');
+const withIconic = (team: ReturnType<typeof bandTeam>): ReturnType<typeof bandTeam> => { const t = team.slice(0, 4); t.push(cBaller(iconics[Math.floor(rnd() * iconics.length)], null, 1, rnd() < 0.2)); return t; };
+if (want('specials')) {
+  const w: Record<string, { w: number; g: number }> = {};
+  for (const a of CLS_KEYS) w[a] = { w: 0, g: 0 };
+  const all = newAgg();
+  let used = 0, sides = 0, usedEarly = 0, games = 0;
+  const byType: Record<string, number> = {};
+  for (const a of CLS_KEYS) for (const b of CLS_KEYS) {
+    if (a === b) continue;
+    for (let i = 0; i < N; i++) {
+      const A = newSide(a, withIconic(bandTeam(0.4, 0.7)), cpuDeck(a, 0.5)), B = newSide(b, withIconic(bandTeam(0.4, 0.7)), cpuDeck(b, 0.5));
+      const G = simGame(A, B, [mid, mid]);
+      w[a].g++; w[b].g++; w[G.winner === 0 ? a : b].w++;
+      tally(all, G, [A, B]);
+      games++;
+      for (const S of G.sides) for (const x of [...S.team, ...S.bench]) if (x.special) { sides++; if (x.spUsed) { used++; byType[x.special.type] = (byType[x.special.type] || 0) + 1; } }
+    }
+  }
+  report(all, `Coach vs coach with one Iconic per squad (specials ${T.spOn ? 'ON' : 'OFF'})`);
+  console.log('coach win rates: ' + CLS_KEYS.map((k) => `${k} ${pc(w[k].w, w[k].g)}`).join(' · '));
+  console.log(`specials used in ${pc(used, sides)} of ${sides} Iconic appearances (${f1(used / games)} per game); by type: ${Object.entries(byType).map(([k, v]) => `${k} ${v}`).join(' ')}`);
+}
 const win: Record<string, { w: number; g: number }> = {};
 if (want('coach')) {
 for (const a of CLS_KEYS) win[a] = { w: 0, g: 0 };
@@ -101,7 +127,7 @@ console.log(`top-band squad beats low-band squad in ${pc(strongW, N * 4)}`);
 }
 
 // a strong (unlocked) squad: top-band Ballerz with Sneakerz, levelled to 5, and a good deck
-const strongSquad = () => bandTeam(0.88, 1).map((b) => cBaller(b.id, b.sneakerId, 5));
+const strongSquad = () => { const t = bandTeam(0.88, 1).map((b) => cBaller(b.id, b.sneakerId, 5)); return process.env.BDL_ICONIC ? [...t.slice(0, 4), cBaller(iconics[Math.floor(rnd() * iconics.length)], t[4].sneakerId, 5, rnd() < 0.2)] : t; };
 // a fresh player (starter Ballerz + starter deck, decent decisions) against each stage
 if (want('story')) {
 const player: AiSkill = { smart: 0.75, sigma: 0.1 };

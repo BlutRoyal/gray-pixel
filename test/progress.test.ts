@@ -47,9 +47,9 @@ describe('tiers by rank', () => {
 });
 
 describe('packs', () => {
-  it('Baller packs have 4 cards and no Sneaker, the Sneaker Box 3 Sneakerz', () => {
+  it('Baller packs have 2 Ballerz + 3 Play cards and no Sneaker, the Sneaker Box 3 Sneakerz', () => {
     seedRng(3);
-    for (const id of ['street', 'pro', 'icon']) { const p = openPack(packDef(id)); expect(p.length).toBe(4); expect(p.some((x) => x.kind === 'sneaker')).toBe(false); }
+    for (const id of ['basic', 'street', 'pro', 'icon']) { const p = openPack(packDef(id)); expect(p.length).toBe(5); expect(p.filter((x) => x.kind === 'baller').length).toBe(2); expect(p.filter((x) => x.kind === 'play').length).toBe(3); expect(p.some((x) => x.kind === 'sneaker')).toBe(false); }
     expect(openPack(packDef('box')).every((x) => x.kind === 'sneaker')).toBe(true);
     expect(packDef('box').price * 2).toBe(packDef('street').price);
     for (const id of ['probox', 'iconbox']) expect(openPack(packDef(id)).length).toBe(3);
@@ -78,7 +78,7 @@ describe('packs', () => {
     for (const c of v2.filter((x) => x.rarity !== 'iconic')) expect(seen.has(c.k)).toBe(true);
     expect(cardTier(ccard('heave')!)).toBe('iconic');
     expect(cardTier(ccard('iso')!)).toBe('legendary');
-    expect(PACKS.length).toBe(6);
+    expect(PACKS.length).toBe(7);
   });
 });
 

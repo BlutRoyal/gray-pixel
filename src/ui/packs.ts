@@ -2,9 +2,10 @@
 import { TIERS, TIER_NAME, rnd, seedRng, tierRank, type Tier } from '../rules';
 import { BALLER_PACKS, PACKS, SNEAKER_PACKS, isBox, openPack, oddsPct, packChance, packDef, type Odds, type PackDef, type Pull } from '../casual/packs';
 import { SHARD_YIELD } from '../casual/progress';
-import { addPull, profile, save, setMusic, spend } from './store';
+import { addPull, claimDailyPack, dailyPackReady, msToNextDay, profile, save, setMusic, spend } from './store';
 import { sfx } from './sfx';
 import { setMusicOverride } from './music';
+import { ballerTier } from '../rules';
 import { liteOn } from './lite';
 import { PACK_LINES } from './lore';
 import { strayHTML } from './wordmark';
@@ -16,8 +17,18 @@ export function initPacks(changed: () => void): void {
   onChange = changed;
   document.addEventListener('keydown', (e) => {
     if (!OP || OP.mode !== 'card' || (e.target as HTMLElement | null)?.closest('button')) return;
-    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    // keyboard: the same two steps as the mouse. Flip the face-down card, then NEXT CARD.
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); if (OP.step === 'wait') flip(); else if (OP.step === 'shown') next(); }
   });
+  window.setInterval(() => { const el = document.getElementById('dailyT'); if (el) el.textContent = dailyTimer(); }, 30000);
+}
+/** Time until the free daily pack unlocks again (local midnight), e.g. "7h 12m". */
+export function dailyTimer(): string { const m = Math.ceil(msToNextDay() / 60000); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
+/** The free daily Basic Pack: claim button when it is ready, otherwise the countdown to the next one. */
+export function dailyHTML(compact = false): string {
+  const ready = dailyPackReady();
+  return `<div class="daily${ready ? ' ready' : ''}${compact ? ' compact' : ''}"><span class="daily-t"><b>Free daily Basic Pack</b><small class="dim">${ready ? 'Ready. Resets at local midnight.' : `Claimed today. Next one in <span id="dailyT">${dailyTimer()}</span>.`}</small></span>
+    <button class="btn${ready ? ' go' : ''}" data-a="claimdaily" ${ready ? '' : 'disabled'}>${ready ? 'Claim free pack' : 'Claimed'}</button></div>`;
 }
 
 const pctTxt = (n: number) => (n >= 10 ? n.toFixed(0) : n >= 1 ? n.toFixed(1) : n >= 0.1 ? n.toFixed(2) : n.toFixed(3)) + '%';
@@ -53,14 +64,15 @@ function tileHTML(d: PackDef): string {
       <details class="pt-more"><summary class="dim small">All odds and rules</summary>
         <div class="odds"><span class="dim small">${box ? 'Sneaker odds' : 'Baller slot odds'}</span>${oddsLine(first.odds)}</div>
         ${last && last.odds !== first.odds ? `<div class="odds"><span class="dim small">Last Baller</span>${oddsLine(last.odds)}</div>` : ''}
-        <span class="dim small">8% of cards come out Holo (cosmetic only). A duplicate Baller or Sneaker turns into shards for the shared pool; a duplicate Play card gives shards to that card.</span></details></div>`;
+        <span class="dim small">${box ? '' : `About 1 in 5 Iconic Ballerz comes out HOLO: a glitching foil with a stronger special. Pull the HOLO of an Iconic you own as a normal card and it takes his place; the normal copy turns into ${SHARD_YIELD.iconic} shards. `}A duplicate Baller or Sneaker turns into shards for the shared pool; a duplicate Play card gives shards to that card.</span></details></div>`;
 }
 export function packsHTML(): string {
   const P = profile();
   return `<section class="panel">
     <h2 class="h">Pack shop</h2>
     <p class="lore-line">${esc(PACK_LINES.shop)}</p>
-    <details class="pt-about"><summary class="dim small">About packs and ranks</summary><p class="dim small">Packs are bought with Bucks you earn by playing. Cards are off-chain copies, so owning a Baller NFT and owning his card are separate things. Ballerz are ranked by their three best stats: the top 50 are <b class="ic-txt">Iconic</b>, the next 200 Legendary, the next 750 Epic. A duplicate Baller or Sneaker turns into shards that level up your Ballerz.</p></details>
+    <details class="pt-about"><summary class="dim small">About packs and ranks</summary><p class="dim small">Packs are bought with Bucks you earn by playing, and one Basic Pack a day is free. Cards are off-chain copies, so owning a Baller NFT and owning his card are separate things. Ballerz are ranked by their three best stats: the top 50 are <b class="ic-txt">Iconic</b>, the next 200 Legendary, the next 750 Epic. A duplicate Baller or Sneaker turns into shards that level up your Ballerz.</p></details>
+    ${dailyHTML()}
     <div class="row"><button class="chipbtn${P.music ? ' on' : ''}" data-a="music">${P.music ? '♪ Music on' : '♪ Music off'}</button><span class="dim small">${P.shards} shards</span></div>
     <div class="pack-grid">${BALLER_PACKS.map(tileHTML).join('')}</div>
     <h3 class="h3">Sneakerz</h3>
@@ -71,14 +83,25 @@ export function packsHTML(): string {
 }
 
 // ---------- opening ----------
-/** One card at a time: it drops from the top and bounces like a basketball, then charges (longer for rarer cards) and flips. A tap goes to the
- *  next card; the last tap shows a summary with every card. `step` says where the current card is. */
+/** One card at a time. It drops from the top face down and waits: nothing flips by itself. A click on the card starts the flip (the drama grows
+ *  with the tier); once flipped, clicking the card only tilts it. Only the NEXT CARD button moves on, and the next card is face down again.
+ *  The last button shows a summary with every card. `step`: drop (falling), wait (face down, click to flip), flip (turning), shown (face up). */
 interface Opening {
-  def: PackDef; pulls: Pull[]; isNew: boolean[]; i: number; mode: 'pack' | 'card' | 'sum'; step: 'drop' | 'charge' | 'shown'; busy: boolean; shards: number; cardShards: number;
+  def: PackDef; pulls: Pull[]; isNew: boolean[]; i: number; mode: 'pack' | 'card' | 'sum'; step: 'drop' | 'wait' | 'flip' | 'shown'; busy: boolean; shards: number; cardShards: number;
   anim: Animation | null; timers: number[];
 }
 let OP: Opening | null = null;
-const CHARGE_MS: Record<Tier, number> = { common: 650, uncommon: 850, rare: 1600, epic: 2200, legendary: 3300, iconic: 4200 };
+/** How long the flip takes per tier (ms): a slow, building turn for the rare ones. */
+export const FLIP_MS: Record<Tier, number> = { common: 520, uncommon: 600, rare: 900, epic: 1300, legendary: 1900, iconic: 2400 };
+/** What a face-down card shows about its tier before the flip: edge glow strength 0..1 and the number of sparks around it. The colour is the tier colour. */
+export const TIER_HINT: Record<Tier, { glow: number; sparks: number }> = {
+  common: { glow: 0, sparks: 0 }, uncommon: { glow: 0.15, sparks: 1 }, rare: { glow: 0.35, sparks: 3 }, epic: { glow: 0.55, sparks: 5 }, legendary: { glow: 0.8, sparks: 8 }, iconic: { glow: 1, sparks: 12 },
+};
+const isHoloIconic = (p: Pull): boolean => p.holo && p.tier === 'iconic';
+const hintSparks = (p: Pull): string => {
+  const n = Math.round(TIER_HINT[p.tier].sparks / (liteOn() ? 2 : 1));
+  return Array.from({ length: n }, (_x, k) => `<i style="--a:${Math.round((360 / n) * k + 12)}deg;--d:${(k % 5) * 0.37}s"></i>`).join('');
+};
 
 function faceHTML(p: Pull, isNew: boolean): string {
   const o = { holo: p.holo, isNew };
@@ -87,7 +110,7 @@ function faceHTML(p: Pull, isNew: boolean): string {
   return playCardHTML(p.id as string, o);
 }
 /** The shard badge on a duplicate: Baller and Sneaker shards go to the shared pool, Play card shards to that card only. */
-export const dupeHTML = (p: Pull): string => (p.shards ? `<span class="dupe"><b>DUPLICATE · +${p.shards} shards</b><small>${p.cardShard ? 'for this card only' : 'to your shard pool'}</small></span>` : '');
+export const dupeHTML = (p: Pull): string => (p.upgrade ? `<span class="dupe up"><b>HOLO UPGRADE · +${p.shards} shards</b><small>your normal copy became shards</small></span>` : p.shards ? `<span class="dupe"><b>DUPLICATE · +${p.shards} shards</b><small>${p.cardShard ? 'for this card only' : 'to your shard pool'}</small></span>` : '');
 /** Opens a pack without paying (story rewards). */
 export function freePack(id: string, forceIconic = false): void { open(id, true, forceIconic); }
 function buy(id: string): void { open(id, false); }
@@ -139,7 +162,7 @@ function showPack(): void {
   const o = overlayEl(), op = OP!;
   delete o.dataset.a;
   // an Iconic inside makes the pack glitch before it's even opened
-  const iconic = op.pulls.some((p) => p.tier === 'iconic');
+  const iconic = op.pulls.some(isHoloIconic);
   const art = packArt(op.def, true);
   o.innerHTML = `<div class="op-stage"><button class="pack-hit${iconic ? ' glitch' : ''}" data-a="rip" aria-label="Rip the pack open">${iconic
     ? `<span class="gl-wrap">${art}<span class="gl-layer gl-a" aria-hidden="true">${art}</span><span class="gl-layer gl-b" aria-hidden="true">${art}</span></span>` : art}</button>
@@ -190,26 +213,28 @@ const bouncesFor = (tier: Tier): number[] => {
   return tier === 'iconic' ? [b1, b1 * 0.5, b1 * 0.22] : [b1, b1 * 0.45];
 };
 function stageHTML(op: Opening): string {
-  const i = op.i, p = op.pulls[i], n = op.pulls.length;
+  const i = op.i, p = op.pulls[i], n = op.pulls.length, h = TIER_HINT[p.tier];
   return `<div class="op-stage solo">
     <div class="op-top"><span class="op-count">Card <b>${i + 1}</b> of ${n}</span><span class="op-dots" aria-hidden="true">${op.pulls.map((_x, k) => `<i class="${k < i ? 'done' : k === i ? 'now' : ''}"></i>`).join('')}</span><button class="btn sm" data-a="opskip">Skip all</button></div>
-    <div class="op-slot"><div class="flip solo t-${p.tier}" id="opCard" aria-label="Card ${i + 1} of ${n}, face down">
+    <div class="op-slot"><div class="flip solo t-${p.tier}" id="opCard" data-a="opflip" role="button" tabindex="0" style="--hint:${h.glow};--flipms:${FLIP_MS[p.tier]}ms" aria-label="Card ${i + 1} of ${n}, face down. Tap to flip.">
+      <span class="hint-sparks" aria-hidden="true">${hintSparks(p)}</span>
       <span class="flip-in"><span class="back"><span class="back-logo">G${strayHTML('back-stray')}</span><span class="back-ring"></span></span><span class="front">${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</span></span></div></div>
     <p class="op-hint" id="opHint">&nbsp;</p>
-    <button class="btn op-next" id="opNextBtn" data-a="opnext">Tap to skip</button></div>`;
+    <button class="btn op-next" id="opNextBtn" data-a="opnext" disabled>Tap the card to flip</button></div>`;
 }
-/** The big bottom button: a quiet "skip" while the card drops and charges, a glowing NEXT CARD once it is face up. */
+/** The big bottom button: disabled (a quiet prompt) until the card is face up, then a glowing NEXT CARD. */
 function nextBtn(label: string, ready: boolean): void {
-  const b = document.getElementById('opNextBtn');
+  const b = document.getElementById('opNextBtn') as HTMLButtonElement | null;
   if (!b) return;
   b.textContent = label;
+  b.disabled = !ready;
   b.classList.toggle('go', ready); b.classList.toggle('ready', ready);
 }
 function showCards(): void { OP!.i = 0; OP!.mode = 'card'; dealCard(); }
 function dealCard(): void {
   const op = OP!, o = overlayEl(), p = op.pulls[op.i];
   op.mode = 'card'; op.step = 'drop'; op.busy = false;
-  o.dataset.a = 'opnext';
+  delete o.dataset.a;
   o.innerHTML = stageHTML(op);
   const el = o.querySelector<HTMLElement>('#opCard')!;
   const hint = o.querySelector('#opHint')!;
@@ -221,22 +246,39 @@ function dealCard(): void {
   hint.textContent = 'Face down...';
   later(land, dur);
 }
-/** The card has landed: charge in its tier colour (longer and louder for rarer cards), then flip. */
+/** The card has landed face down and WAITS. Its edge colour, glow and sparks hint at the tier; nothing happens until it is clicked. */
 function land(): void {
   const op = OP!;
   if (op.step !== 'drop') return;
-  op.step = 'charge';
+  op.step = 'wait';
   op.anim?.cancel(); op.anim = null;
+  const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard');
+  if (!el) return;
+  el.classList.add('waiting');
+  const hint = o.querySelector('#opHint');
+  if (hint) hint.textContent = 'Tap the card to flip it';
+  el.focus({ preventScroll: true });
+}
+/** Click on the face-down card: the flip starts now. The turn is slower and louder for rarer tiers; a HOLO Iconic glitches while it turns. */
+function flip(): void {
+  const op = OP;
+  if (!op || op.mode !== 'card') return;
+  if (op.step === 'drop') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; land(); return; }
+  if (op.step !== 'wait') return;
+  op.step = 'flip';
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
-  const hint = o.querySelector('#opHint')!;
-  const rank = tierRank(p.tier);
-  const ms = reduced() ? 0 : CHARGE_MS[p.tier];
-  el.style.setProperty('--cms', ms + 'ms');
-  el.classList.add('charging');
-  if (!reduced()) sfx('packCharge', { ms, rank, i: op.i });
-  if (p.tier === 'iconic' && !liteOn() && !reduced()) { el.classList.add('glitching'); sfx('glitch2'); }
-  hint.textContent = rank >= 4 ? 'Something huge is compiling...' : rank >= 2 ? 'Something is compiling...' : '...';
+  el.removeAttribute('data-a');
+  el.classList.remove('waiting');
+  const rank = tierRank(p.tier), ms = reduced() ? 0 : FLIP_MS[p.tier];
+  el.classList.add('flipping', 'flipped');
+  if (!reduced()) {
+    sfx('packCharge', { ms, rank, i: op.i });
+    if (isHoloIconic(p) && !liteOn()) { el.classList.add('glitching'); sfx('glitch2'); }
+  }
+  const hint = o.querySelector('#opHint');
+  if (hint) hint.textContent = rank >= 4 ? 'Something huge is compiling...' : rank >= 2 ? 'Something is compiling...' : '...';
+  nextBtn('Flipping...', false);
   later(reveal, ms);
 }
 function reveal(): void {
@@ -245,28 +287,27 @@ function reveal(): void {
   op.step = 'shown';
   const o = overlayEl(), el = o.querySelector<HTMLElement>('#opCard'), p = op.pulls[op.i];
   if (!el) return;
-  el.classList.remove('charging', 'glitching');
-  el.classList.add('flipped');
-  el.setAttribute('aria-label', `${TIER_NAME[p.tier]} card`);
+  el.classList.remove('flipping', 'glitching');
+  el.classList.add('shown');
+  el.setAttribute('aria-label', `${TIER_NAME[p.tier]}${p.holo ? ' HOLO' : ''} card. Tilts when touched. Use Next card to continue.`);
   const rank = tierRank(p.tier);
-  if (rank >= 1 || p.holo) burst(el, p.tier);
-  if (rank >= 4) rain(p.tier);
+  if (rank >= 1 || p.holo) burst(el, p.tier, isHoloIconic(p));
+  if (rank >= 4) rain(p.tier, isHoloIconic(p));
   const prevMax = op.pulls.slice(0, op.i).reduce((m, q) => Math.max(m, tierRank(q.tier)), -1);
   const newBest = op.i > 0 && rank > prevMax && rank >= 2;
   sfx(rank >= 5 ? 'iconicHit' : 'packReveal', { rank, i: op.i, newBest });
+  if (isHoloIconic(p)) setTimeout(() => sfx('glitch3'), 450);
   const last = op.i === op.pulls.length - 1;
   const hint = o.querySelector('#opHint');
-  if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · Holo' : ''}${op.isNew[op.i] ? ' · NEW' : ''}`;
+  if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · HOLO' : ''}${p.upgrade ? ' · UPGRADE' : op.isNew[op.i] ? ' · NEW' : ''}`;
   if (newBest && !reduced()) { el.classList.add('newbest'); later(() => el.classList.remove('newbest'), 1400); }
   nextBtn(last ? 'SEE SUMMARY' : 'NEXT CARD', true);
 }
-/** A tap: skip the drop, skip the charge, or go to the next card (the last one opens the summary). */
+/** The NEXT CARD button (only when the card is face up): the next card, or after the last one the summary. */
 function next(): void {
   const op = OP;
-  if (!op || op.mode !== 'card') return;
+  if (!op || op.mode !== 'card' || op.step !== 'shown') return;
   sfx('nextTick');
-  if (op.step === 'drop') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; land(); return; }
-  if (op.step === 'charge') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; reveal(); return; }
   if (op.i >= op.pulls.length - 1) { showSummary(); return; }
   clearTimers();
   op.i++;
@@ -276,7 +317,9 @@ function showSummary(): void {
   const op = OP!, o = overlayEl();
   clearTimers();
   op.mode = 'sum';
-  sfx('summary');
+  const ic = op.pulls.find((p) => p.tier === 'iconic'), holoIc = op.pulls.some(isHoloIconic);
+  if (ic) { sfx('triumphHit', { rank: holoIc ? 1 : 0 }); setMusicOverride(profile().music ? 'triumph' : 'none', holoIc ? 1 : 0.55); }
+  else sfx('summary');
   if (op.shards || op.cardShards) setTimeout(() => sfx('shard'), 700);
   delete o.dataset.a;
   const news = op.isNew.filter(Boolean).length;
@@ -292,12 +335,12 @@ function showSummary(): void {
   o.scrollTop = 0;
 }
 /** Golden (or glitch-pink) particles falling from the top; skipped in lite mode and with reduced motion. */
-function rain(tier: Tier): void {
+function rain(tier: Tier, holo = false): void {
   if (reduced() || liteOn()) return;
   const n = tier === 'iconic' ? 46 : 30;
   for (let i = 0; i < n; i++) {
     const d = document.createElement('i');
-    d.className = 'rain t-' + tier;
+    d.className = 'rain t-' + tier + (tier === 'iconic' && !holo ? ' gold' : '');
     d.style.left = rnd() * 100 + 'vw';
     d.style.setProperty('--rd', 1.3 + rnd() * 1.4 + 's');
     d.style.setProperty('--rw', rnd() * 0.9 + 's');
@@ -306,13 +349,13 @@ function rain(tier: Tier): void {
     setTimeout(() => d.remove(), 3000);
   }
 }
-function burst(el: HTMLElement, tier: Tier): void {
+function burst(el: HTMLElement, tier: Tier, holo = false): void {
   if (reduced()) return;
   const n = Math.round((tier === 'iconic' ? 60 : tier === 'legendary' ? 34 : 14) / (liteOn() ? 3 : 1));
   const r = el.getBoundingClientRect();
   for (let i = 0; i < n; i++) {
     const d = document.createElement('i');
-    d.className = 'spark t-' + tier;
+    d.className = 'spark t-' + tier + (tier === 'iconic' && !holo ? ' gold' : '');
     const a = (Math.PI * 2 * i) / n + rnd() * 0.4, dist = 90 + rnd() * 120;
     d.style.left = r.left + r.width / 2 + 'px';
     d.style.top = r.top + r.height / 2 + 'px';
@@ -323,12 +366,12 @@ function burst(el: HTMLElement, tier: Tier): void {
   }
   if (tier === 'legendary' || tier === 'iconic') {
     const w = document.createElement('div');
-    w.className = 'walkout t-' + tier;
-    w.innerHTML = `<b>${TIER_NAME[tier].toUpperCase()}</b>`;
+    w.className = 'walkout t-' + tier + (tier === 'iconic' ? (holo ? ' holo' : ' gold') : '');
+    w.innerHTML = holo ? `<b class="gl-title-b" data-text="HOLO">HOLO</b><small>ICONIC</small>` : `<b>${TIER_NAME[tier].toUpperCase()}</b>`;
     document.body.appendChild(w);
     setTimeout(() => w.remove(), tier === 'iconic' ? 2200 : 1500);
     const f = document.createElement('div');
-    f.className = 'flash t-' + tier;
+    f.className = 'flash t-' + tier + (tier === 'iconic' ? (holo ? ' holo' : ' gold') : '');
     document.body.appendChild(f);
     setTimeout(() => f.remove(), 700);
     document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake');
@@ -339,6 +382,8 @@ export function packsAct(a: string, v: string | undefined): boolean {
     case 'buy': document.getElementById('opening')?.remove(); clearTimers(); buy(v!); return true;
     case 'openpending': document.getElementById('opening')?.remove(); clearTimers(); openPending(); return true;
     case 'rip': rip(); return true;
+    case 'opflip': flip(); return true;
+    case 'claimdaily': if (claimDailyPack()) { document.getElementById('opening')?.remove(); clearTimers(); freePack('basic'); } return true;
     case 'opnext': next(); return true;
     case 'opskip': if (OP && OP.mode === 'card') showSummary(); return true;
     case 'opclose': document.getElementById('opening')?.remove(); clearTimers(); OP = null; setMusicOverride(null); onChange(); return true;

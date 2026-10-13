@@ -5,7 +5,7 @@
 // Each track is a pure scheduler: step(buses, stepIndex, time, intensity). The live player (music.ts) and the offline renderer both call it.
 import { click, crush, env, nz, osc, rng, sat, sub, uni, type Rig } from './synth';
 
-export type TrackName = 'pack' | 'game' | 'title';
+export type TrackName = 'pack' | 'game' | 'title' | 'triumph';
 export interface Buses {
   ctx: BaseAudioContext;
   /** Drums and sub: straight to the music bus. */
@@ -179,4 +179,25 @@ const titleTrack: Track = {
   },
 };
 
-export const TRACKS: Record<TrackName, Track> = { pack: packTrack, game: gameTrack, title: titleTrack };
+// ---------- triumph: heavy fanfare loop (Iconic pulls, wins). I = 0.5 normal, 1 = HOLO Iconic / a big win ----------
+const TRI_CH = [[174.61, 261.63, 349.23], [138.59, 207.65, 277.18], [233.08, 349.23, 466.16], [130.81, 196, 261.63]];
+const TRI_ARP = [0, 1, 2, 1, 2, 1, 0, 2];
+const triumphTrack: Track = {
+  name: 'triumph', bpm: 96, len: 64, swing: 0.04,
+  step(b, i, t, s16, I) {
+    const bar = (i >> 4) & 3, s = i & 15, hi = I >= 0.8;
+    if (s === 0 || s === 6 || s === 8 || (s === 11 && bar % 2 === 1) || (hi && s === 14)) { kick(b, t, s === 0 ? 1 : 0.9); pump(b, t, 0.35, 0.22); }
+    if (s === 4 || s === 12) { snare(b, t, 1); if (!b.lite) clap(b, t + 0.002, 0.7); }
+    if (s % 2 === 0) hat(b, t, s % 4 === 0 ? 0.7 : 0.45, s === 14);
+    if (hi && s % 4 === 3) hat(b, t, 0.4);
+    if (s === 0 || s === 6 || s === 10) s808(b, t, ROOT[bar] * (s === 10 ? 1.5 : 1), s16 * (s === 0 ? 5 : 3), 0.9);
+    // brass stabs on the 808 hits; the long one opens each bar
+    if (s === 0 || s === 6 || s === 10) uni(b.mel, 'sawtooth', TRI_CH[bar], t, s16 * (s === 0 ? 6 : 2.2), (0.42 + I * 0.18), { lp: 2300 + I * 1800, spread: 16, rev: 0.3, a: 0.008, hold: s === 0 ? s16 * 2 : 0 });
+    if (s === 0 && bar === 0) nz(b.drums, t, 1.1, 0.3, { ft: 'highpass', f0: 5200, a: 0.004, rev: 0.3 });
+    if (s === 0 && !b.lite) uni(b.mel, 'sawtooth', TRI_CH[bar].map((f) => f / 2), t, s16 * 15, 0.3, { lp: 700, a: 0.2, spread: 12, rev: 0.3, hold: s16 * 6 });
+    // fanfare arpeggio: bitcrushed bells climbing the chord, only when the intensity is high
+    if (hi && !b.lite && s % 2 === 1) { const f = TRI_CH[bar][TRI_ARP[(s >> 1) & 7] % 3] * (s > 7 ? 4 : 2); osc(b.arp, 'square', f, f, t, s16 * 1.2, 0.17, { lp: 3600, a: 0.002, rev: 0.25 }); }
+  },
+};
+
+export const TRACKS: Record<TrackName, Track> = { pack: packTrack, game: gameTrack, title: titleTrack, triumph: triumphTrack };

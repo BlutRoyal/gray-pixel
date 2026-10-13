@@ -2,14 +2,17 @@
 // Defense picks a scheme that guesses a zone, plays at most one card, can double team and re-assigns man-to-man matchups.
 // Momentum (0..10) pays for big cards, double teams and subs. Fatigue, Sneakerz, Baller skills and Traps all feed one shot chance.
 // DOM-free and seeded through rules/rng, so the AI vs AI sim and the tests run it headless.
+import { blankBox, moRefund, moSync, type BoxRec } from './box';
 import { CLASSES, CLS_KEYS, ballerRow, ballerTier, catalog, classOf, makeBaller, ri, rnd, sneakerRow, type ClassKey } from '../rules';
 import { TUNING as T } from './tuning';
 export { TUNING } from './tuning';
 import { allCards, ccard, isHard, isTrap, withLevel, type CCard } from './cards';
+import { SP_KINDS, specialFor, specialText, spValue, type SpType, type Special } from './specials';
 import { ENH, POS_NAME, SCHEME_NAME, ZONES, ZONE_NAME, ZONE_PTS, positionOf, shoeOf, skillFor, type Pos, type Shoe, type Skill, type Zone } from './skills';
 
 export type { CCard } from './cards';
 export type { Zone, Pos, Skill, Shoe } from './skills';
+export type { Special, SpType } from './specials';
 export { ZONES, ZONE_NAME, ZONE_PTS, SCHEME_NAME } from './skills';
 export type Side = 0 | 1;
 
@@ -51,6 +54,11 @@ export interface CBaller {
   level: number;
   pos: Pos;
   skill: Skill;
+  /** HOLO variant of an Iconic Baller: his special is stronger. */
+  holo: boolean;
+  /** Iconic special (once per game), null for everyone else. */
+  special: Special | null;
+  spUsed: boolean;
   /** Ratings the rules use: Rim (dunk), Mid (shooting + playmaking), Three (shooting), Playmaking and Defense. */
   rim: number;
   mid: number;
@@ -65,7 +73,7 @@ export interface CBaller {
   streak: number;
 }
 export const rating = (b: CBaller, z: Zone): number => (z === 'rim' ? b.rim : z === 'mid' ? b.mid : b.three);
-export function cBaller(id: number, sneakerId: number | null = null, level = 1): CBaller {
+export function cBaller(id: number, sneakerId: number | null = null, level = 1, holo = false): CBaller {
   const row = ballerRow(id)!;
   const sr = sneakerId != null ? sneakerRow(sneakerId) || null : null;
   const b = makeBaller(row, sr || [0, NO_SNEAKER_J, 0, 0, 0, 0]);
@@ -73,21 +81,21 @@ export function cBaller(id: number, sneakerId: number | null = null, level = 1):
   const st = { D: b.st.D + up, P: b.st.P + up, S: b.st.S + up, F: b.st.F + up, J: sr ? sr[1] : NO_SNEAKER_J };
   const pos = positionOf(st), tier = ballerTier(id);
   return {
-    id, name: b.name, team: b.team, cls: classOf(st), st, sneakerId: sr ? sr[0] : null, shoe: shoeOf(sr), tier, level: lv, pos, skill: skillFor(id, pos, tier),
+    id, name: b.name, team: b.team, cls: classOf(st), st, sneakerId: sr ? sr[0] : null, shoe: shoeOf(sr), tier, level: lv, pos, skill: skillFor(id, pos, tier), holo: holo && tier === 'iconic', special: tier === 'iconic' ? specialFor(id) : null, spUsed: false,
     rim: st.D, mid: Math.round(st.S * 0.6 + st.P * 0.4), three: st.S, ply: st.P, def: st.F, run: 0, cd: 0, hold: 0, streak: 0,
   };
 }
 const shoeScore = (id: number): number => { const s = shoeOf(sneakerRow(id)); return s ? s.bonus + s.jumpRim * 0.5 : 0; };
 export const ballerScore = (b: CBaller): number => Math.max(b.rim, b.mid, b.three) * 0.6 + b.def * 0.25 + b.ply * 0.15;
 /** Gives each Baller a Sneaker. `shoes` is a map Baller id to Sneaker id, or a list of owned Sneakerz that are handed out best-first to the best Ballerz. */
-export function equip(ids: number[], shoes: number[] | Record<number, number | null> = {}, levels: Record<string, number> = {}): CBaller[] {
+export function equip(ids: number[], shoes: number[] | Record<number, number | null> = {}, levels: Record<string, number> = {}, holo: Record<string, boolean> = {}): CBaller[] {
   if (Array.isArray(shoes)) {
     const sn = shoes.filter((id) => sneakerRow(id)).sort((a, b) => shoeScore(b) - shoeScore(a));
     const order = ids.slice().sort((a, b) => ballerScore(cBaller(b, null, levels[b])) - ballerScore(cBaller(a, null, levels[a])));
     const pick = new Map<number, number | null>(order.map((id, i) => [id, sn[i] ?? null]));
-    return ids.map((id) => cBaller(id, pick.get(id) ?? null, levels[id]));
+    return ids.map((id) => cBaller(id, pick.get(id) ?? null, levels[id], !!holo[id]));
   }
-  return ids.map((id) => cBaller(id, shoes[id] ?? null, levels[id]));
+  return ids.map((id) => cBaller(id, shoes[id] ?? null, levels[id], !!holo[id]));
 }
 
 // ---------- coaches ----------
@@ -124,6 +132,8 @@ export interface CSide {
   discount: boolean;
   nextBoost: number;
   lastMadeThree: boolean;
+  /** Rewind: keep the ball after the next attack once. */
+  again: boolean;
   clutches: number;
   /** Flat bonus on every shot (story bosses). */
   edge: number;
@@ -150,7 +160,14 @@ export interface Poss {
   extra: boolean;
   dt: DoubleTeam | null;
   dtPaid: number;
+  /** The special each side used this possession. */
+  sp: [SpFx | null, SpFx | null];
+  /** The shot has been resolved. */
+  done: boolean;
 }
+/** A special in play: its type, the numbers it runs with (HOLO and TUNING applied) and the court slot of the user. */
+export interface SpFx { type: SpType; v: number; idx: number; name: string; holo: boolean }
+export interface SpEvent { side: Side; idx: number; name: string; type: SpType; text: string; holo: boolean; flavor: string }
 export interface TrapNote { name: string; text: string }
 export interface Outcome {
   side: Side;
@@ -173,6 +190,17 @@ export interface Outcome {
   clutch: boolean;
   clutchBonus: number;
   extra: boolean;
+  /** Base chance (rating vs defender): base + every row of `parts` = the final `p` (within rounding). */
+  base?: number;
+  /** Card ids behind the slots, so a box score survives subs. */
+  passerId?: number;
+  defenderId?: number;
+  dtMarkId?: number;
+  /** Rewind cancelled this basket. */
+  rewound?: boolean;
+  /** Specials in play on this shot (offense, defense) and the Fork teammate's shot. */
+  sp?: [string | null, string | null];
+  fork?: { shooter: number; id: number; zone: Zone; p: number } | null;
   revenge: string[];
   iso: boolean;
   blocked: boolean;
@@ -206,6 +234,10 @@ export interface CGame {
   log: string[];
   hist: HistLine[];
   feed: FeedLine[];
+  /** Specials used and not yet shown by the UI. */
+  spq: SpEvent[];
+  /** Recorder for the box score (see box.ts). */
+  box: BoxRec;
 }
 export const lowLabel = (p: number): string | null => (p < 2 ? 'SYSTEM ERROR' : p < 5 ? 'OVERCLOCKED' : p < 15 ? 'GLITCHED' : null);
 
@@ -274,22 +306,23 @@ export function autoMatch(def: CBaller[], off: CBaller[]): number[] {
 const rematch = (G: CGame): void => { G.sides[0].match = autoMatch(G.sides[0].team, G.sides[1].team); G.sides[1].match = autoMatch(G.sides[1].team, G.sides[0].team); };
 /** `squad` is up to five Ballerz: the first three start, the rest wait on the bench. The Ballerz are copied, so a squad can be reused. */
 export function newSide(coach: ClassKey, squad: CBaller[], deck: CCard[], cardLv: Record<string, number> = {}): CSide {
-  const all = squad.map((b) => ({ ...b, run: 0, cd: 0, hold: 0, streak: 0 }));
+  const all = squad.map((b) => ({ ...b, run: 0, cd: 0, hold: 0, streak: 0, spUsed: false }));
   const z = { rim: 0, mid: 0, three: 0 };
   const S: CSide = {
     coach, team: all.slice(0, COURT_SIZE), bench: all.slice(COURT_SIZE), deck: shuffle(deck.map((c) => withLevel(c, cardLv[c.k] || 1))), discard: [], hand: [], traps: [], score: 0,
     mo: T.moStart + (coach === 'bucket' ? 3 : 0), match: [0, 1, 2], run: { idx: -1, n: 0 }, cold: { v: 0, turns: 0 }, shadow: { idx: -1, turns: 0 },
-    aura: { rim: 0, mid: 0, three: 0, lock: 0 }, discount: false, nextBoost: 0, lastMadeThree: false, clutches: 0, edge: 0,
+    aura: { rim: 0, mid: 0, three: 0, lock: 0 }, discount: false, nextBoost: 0, lastMadeThree: false, again: false, clutches: 0, edge: 0,
     stats: { subs: 0, dts: 0, trapsFired: 0, hard: 0, isos: 0, cards: 0, momentumSpent: 0, made: { ...z }, shots: { ...z } },
   };
   draw(S, coach === 'show' ? HAND_START + 1 : HAND_START);
   return S;
 }
-const blankPoss = (off: Side): Poss => ({ off, shooter: 0, zone: null, guard: null, offCard: null, defCard: null, newTraps: [], used: [false, false], clutch: false, extra: false, dt: null, dtPaid: 0 });
+const blankPoss = (off: Side): Poss => ({ off, shooter: 0, zone: null, guard: null, offCard: null, defCard: null, newTraps: [], used: [false, false], clutch: false, extra: false, dt: null, dtPaid: 0, sp: [null, null], done: false });
 export function newGame(a: CSide, b: CSide, first: Side = rnd() < 0.5 ? 0 : 1): CGame {
-  const G: CGame = { sides: [a, b], n: 0, poss: blankPoss(first), over: false, winner: null, last: null, log: [], hist: [], feed: [] };
+  const G: CGame = { sides: [a, b], n: 0, poss: blankPoss(first), over: false, winner: null, last: null, log: [], hist: [], feed: [], spq: [], box: blankBox() };
   rematch(G);
   startPossession(G, first);
+  moSync(G);
   return G;
 }
 const top = (b: CBaller): number => Math.max(b.rim, b.mid, b.three);
@@ -302,6 +335,8 @@ export const canShoot = (b: CBaller): boolean => b.hold <= 0;
  */
 export function shooterSlots(G: CGame, s: Side, card?: CCard | null): number[] {
   const S = G.sides[s], P = G.poss, c = card === undefined ? P.offCard : card;
+  const spx = P.sp[s];
+  if (spx && P.off === s && SP_KINDS[spx.type].bound && !c?.fx.iso && S.team[spx.idx]) return [spx.idx];
   const dt = P.off === s && P.dt && !c?.fx.iso ? P.dt : null;
   let ok = S.team.map((_b, i) => i).filter((i) => canShoot(S.team[i]));
   if (c && (c.fx.pass || c.fx.allIn)) ok = S.team.map((_b, i) => i);
@@ -327,6 +362,8 @@ function startPossession(G: CGame, off: Side): void {
   S.bench.forEach((b) => { b.run = Math.max(0, b.run - FATIGUE.rest); });
   if (G.n > 1) { draw(G.sides[0], 1); draw(G.sides[1], 1); }
   G.poss.shooter = bestShooter(S, shooterSlots(G, off, null));
+  moSync(G);
+  for (const b of S.team) { const f = fatigueOf(b); if (f > (G.box.fat[b.id] || 0)) G.box.fat[b.id] = f; }
 }
 export function fatigueOf(b: CBaller): number {
   const over = Math.max(0, b.run - (FATIGUE.start - 1));
@@ -349,6 +386,8 @@ export function doSub(G: CGame, s: Side, ci: number, bi: number): boolean {
   if (subBlock(G, s, ci, bi)) return false;
   const S = G.sides[s], P = G.poss;
   const a = S.team[ci], b = S.bench[bi];
+  moSync(G);
+  G.box.subs.push({ n: G.n, side: s, inId: b.id, outId: a.id });
   S.mo -= T.subCost;
   S.stats.momentumSpent += T.subCost;
   S.stats.subs++;
@@ -394,6 +433,8 @@ export function playCard(G: CGame, s: Side, i: number, target = 0): boolean {
   const S = G.sides[s], P = G.poss, c = S.hand[i];
   if (!c || !canPlay(G, s, c)) return false;
   const cost = costOf(G, s, c);
+  moSync(G);
+  G.box.plays.push({ n: G.n, side: s, name: c.name, role: c.fx.trap ? 'trap' : s === P.off ? 'off' : 'def' });
   S.mo -= cost;
   S.stats.momentumSpent += cost;
   S.stats.cards++;
@@ -428,11 +469,11 @@ export function setDT(G: CGame, s: Side, mark: number | null, free = false): boo
   const P = G.poss;
   if (s === P.off) return false;
   const S = G.sides[s];
-  if (P.dt) { S.mo += P.dtPaid; P.dtPaid = 0; P.dt = null; }
+  if (P.dt) { moSync(G); S.mo += P.dtPaid; moRefund(G, s, P.dtPaid); P.dtPaid = 0; P.dt = null; }
   if (mark == null) return true;
   if (!free && S.mo < T.dtCost) return false;
   P.dt = { mark, open: openMan(G, P.off, mark) };
-  if (!free) { S.mo -= T.dtCost; P.dtPaid = T.dtCost; S.stats.momentumSpent += T.dtCost; }
+  if (!free) { moSync(G); S.mo -= T.dtCost; P.dtPaid = T.dtCost; S.stats.momentumSpent += T.dtCost; }
   if (P.shooter === mark && P.dt.open >= 0) P.shooter = P.dt.open;
   else if (!shooterSlots(G, P.off).includes(P.shooter)) P.shooter = bestShooter(G.sides[P.off], shooterSlots(G, P.off));
   return true;
@@ -480,6 +521,8 @@ export function chance(G: CGame, s: Side, shooter: number, zone: Zone, c: ShotCt
   const add = (name: string, v: number) => { if (v) parts.push([name, Math.round(v * 10) / 10]); };
   const fits = (x: CCard) => !x.fx.only || x.fx.only.includes(zone);
   const fx = b.skill.fx;
+  const ox = s === G.poss.off ? G.poss.sp[s] : null, dx = s === G.poss.off ? G.poss.sp[(1 - s) as Side] : null;
+  const mySp = !!ox && ox.idx === shooter;
   if (b.shoe) { add('Sneaker', b.shoe.bonus); if (zone === 'rim' || iso) add('Jump', b.shoe.jumpRim); }
   add(`Skill: ${b.skill.name}`, (fx.zone?.[zone] || 0) + (fx.all || 0));
   if (!open) { const dfx = dfn.skill.fx; add(`${dfn.name}: ${dfn.skill.name}`, -((dfx.stop?.[zone] || 0) + (dfx.stopAll || 0))); }
@@ -491,6 +534,8 @@ export function chance(G: CGame, s: Side, shooter: number, zone: Zone, c: ShotCt
   if (open && passer != null) add('Open man', T.openBonus + (S.team[passer].ply >= 85 ? OPEN_BONUS_PASSER : 0) + (S.team[passer].skill.fx.dtPass || 0));
   if (card && fits(card)) add('Card', card.fx.boost || 0);
   if (dcard && fits(dcard)) add('Their card', -(dcard.fx.lock || 0));
+  if (mySp && (ox!.type === 'skip' || ox!.type === 'loop' || ox!.type === 'worth' || ox!.type === 'ignite' || ox!.type === 'firewall')) add(`Special: ${ox!.name}`, ox!.v);
+  if (dx?.type === 'stop') add(`Special: ${dx.name}`, -dx.v);
   add('Saved boost', S.nextBoost);
   add('Aura', S.aura[zone] - O.aura.lock);
   add('Jinxed', -S.cold.v * (S.cold.turns > 0 ? 1 : 0));
@@ -505,8 +550,9 @@ export function chance(G: CGame, s: Side, shooter: number, zone: Zone, c: ShotCt
   c.extra.forEach(([n, v]) => add(n, v));
   let p = base + parts.reduce((a, x) => a + x[1], 0);
   const forcedRead = S.shadow.turns > 0;
-  const noRead = iso || !!fixed || (!!card?.fx.noRead && fits(card)) || !!fx.ignore?.includes(zone);
-  const read = !noRead && (forcedRead || (c.guard != null && c.guard === zone));
+  const noRead = iso || !!fixed || (!!card?.fx.noRead && fits(card)) || !!fx.ignore?.includes(zone) || (mySp && ox!.type === 'skip');
+  const traced = dx?.type === 'trace';
+  const read = !noRead && (forcedRead || traced || (c.guard != null && c.guard === zone));
   let factor = 1;
   if (read) {
     let pen = 1 - READ[zone];
@@ -516,10 +562,18 @@ export function chance(G: CGame, s: Side, shooter: number, zone: Zone, c: ShotCt
     if (card?.fx.halfRead) pen *= 0.5;
     if (fx.halfRead?.includes(zone)) pen *= 0.5;
     factor = 1 - pen;
+    if (traced) factor = Math.min(factor, 1 - dx!.v / 100);
+    // the multiplicative guess effect becomes its own +/- row, so base + rows adds up to the final chance
+    const before = p;
     p *= factor;
-  }
-  if (fixed) p = fixed;
-  return { p: Math.max(3, Math.min(fixed ? 99 : T.maxP, Math.round(p))), read, base: Math.round(base), parts, factor, passer, open };
+    const why = traced ? `Read: ${dx!.name}` : forcedRead && !(c.guard != null && c.guard === zone) ? 'Shadowed (read)' : `Right guess: ${c.guard != null ? SCHEME_NAME[c.guard] : 'read'}`;
+    parts.push([why, Math.round((p - before) * 10) / 10]);
+  } else if (c.guard != null && !iso && !fixed && !noRead && c.guard !== zone) parts.push([`Wrong guess (beaten): ${SCHEME_NAME[c.guard]}`, 0]);
+  if (mySp && ox!.type === 'sure' && !read && !iso && !fixed && ox!.v > p) { parts.push([`Special: ${ox!.name} (sure shot)`, Math.round((ox!.v - p) * 10) / 10]); p = ox!.v; }
+  if (fixed) { parts.push(['Fixed chance', Math.round((fixed - p) * 10) / 10]); p = fixed; }
+  const lim = Math.max(3, Math.min(fixed ? 99 : T.maxP, Math.round(p)));
+  if (Math.abs(lim - p) >= 0.5) parts.push([lim > p ? 'Minimum chance' : 'Maximum chance', Math.round((lim - p) * 10) / 10]);
+  return { p: lim, read, base: Math.round(base), parts, factor, passer, open };
 }
 /** Chance for the shot being set up right now (cards, scheme and double team as they stand). */
 export const chanceNow = (G: CGame, shooter: number, zone: Zone, guard: Zone | null | undefined = undefined): Chance => {
@@ -555,41 +609,55 @@ export function resolve(G: CGame, clutchBonus = 0): Outcome {
     notes.push(`${dcard.name} cancels ${card.name}. The Momentum is gone.`);
     card = null;
   }
+  const spO = P.sp[s], spD = P.sp[d];
+  if (spD?.type === 'null' && card && !countered) {
+    countered = card.name;
+    notes.push(`${spD.name}: ${card.name} is removed before it does anything. The Momentum is gone.`);
+    card = null;
+  }
   const iso = !!card?.fx.iso;
   if (!iso && P.dt && P.dt.mark === shooter) {
     const alt = P.dt.open >= 0 ? P.dt.open : (shooter + 1) % S.team.length;
     notes.push(`${S.team[shooter].name} is double teamed and can't shoot: ${S.team[alt].name} takes it.`);
     shooter = alt;
   }
+  if (spO && SP_KINDS[spO.type].bound && !iso && S.team[spO.idx]) shooter = spO.idx;
   if (!shooterSlots(G, s, card).includes(shooter) && !(iso && S.team[shooter])) shooter = bestShooter(S, shooterSlots(G, s, card));
   if (iso) zone = 'rim';
   if (card?.fx.fixed) zone = 'three';
   const b = S.team[shooter];
   const defIdx = O.match[shooter];
+  moSync(G);
   const out: Outcome = {
     side: s, shooter, shooterId: b.id, passer: null, zone, guard: P.guard, read: false, p: 0, made: false, pts: 0, turnover: null, traps: [], countered, putback: false, fireOn: false, fireOff: false,
     clutch: false, clutchBonus: 0, extra: false, revenge: [], iso, blocked: false, dt: iso ? null : P.dt, defender: defIdx, offCard: card ? card.name : countered, defCard: dcard ? dcard.name : null,
     andOne: false, a1p: 0, label: null, inhuman: false, notes, parts: [],
+    defenderId: O.team[defIdx]?.id,
   };
   if (P.dt && !iso) {
     O.stats.dts++;
     const mk = S.team[P.dt.mark], op = P.dt.open >= 0 ? S.team[P.dt.open] : null;
     notes.push(`Double team on ${mk.name}${op ? `: ${op.name}'s man left him, so ${op.name} is open` : ''}.`);
   } else if (P.dt && iso) notes.push('The double team is ignored: Iso.');
+  if (spO) notes.push(`${S.team[spO.idx].name} is running ${spO.name}.`);
+  if (spD) notes.push(`${O.team[spD.idx].name} is running ${spD.name}.`);
+  out.sp = [spO ? spO.name : null, spD ? spD.name : null];
   if (card?.fx.fire) b.streak = Math.max(2, b.streak);
   const clutch = P.clutch && S.mo >= T.moMax && !card?.fx.fixed;
-  if (clutch) { out.clutch = true; out.clutchBonus = clutchBonus; S.mo = 0; S.clutches++; notes.push(`Clutch: the full bar goes in. Timing bonus +${clutchBonus}%.`); }
+  if (clutch) { out.clutch = true; out.clutchBonus = clutchBonus; S.mo = 0; moSync(G); S.clutches++; notes.push(`Clutch: the full bar goes in. Timing bonus +${clutchBonus}%.`); }
 
   // turnovers from cards
   if (card?.fx.risk && rnd() * 100 < card.fx.risk) { out.turnover = `${card.name}: the ref called it`; notes.push(`${card.name}: the ref saw it. Turnover.`); }
   if (!out.turnover && dcard?.fx.steal && rnd() * 100 < dcard.fx.steal) { out.turnover = `${dcard.name}: stolen`; notes.push(`${dcard.name}: they took the ball.`); }
+  if (!out.turnover && spD?.type === 'steal' && rnd() * 100 < spD.v) { out.turnover = `${spD.name}: stolen`; notes.push(`${spD.name}: the ball is gone before the shot.`); }
 
   // Traps set on earlier possessions fire now
   const extra: [string, number][] = [];
   const tm = T.trapMult / 100;
   let blocked = false, cap = 100, sense = card?.fx.hard === 'sense';
   const spent = (card ? costOf(G, s, card) : 0) > 0 || iso;
-  if (!out.turnover) {
+  if (spO?.type === 'firewall' && O.traps.length) notes.push(`${spO.name}: their Traps cannot touch this possession.`);
+  if (!out.turnover && spO?.type !== 'firewall') {
     for (const t of O.traps.slice()) {
       if (P.newTraps.includes(t) || t.fx.revenge) continue;
       const f = t.fx, hard = !!f.hard;
@@ -599,6 +667,7 @@ export function resolve(G: CGame, clutchBonus = 0): Outcome {
       if (!hard && card?.fx.noTraps && (!card.fx.only || card.fx.only.includes(zone))) continue;
       O.traps.splice(O.traps.indexOf(t), 1);
       O.discard.push(t);
+      if (spO?.type === 'skip' && (f.hard === 'block' || f.hard === 'shutdown')) { const x = `${spO.name}: ${t.name} can't touch him.`; out.traps.push({ name: t.name, text: x }); notes.push(x); continue; }
       if (sense) {
         sense = false;
         out.traps.push({ name: t.name, text: `Trap Sense: you saw ${t.name} coming and walked around it.` });
@@ -631,16 +700,21 @@ export function resolve(G: CGame, clutchBonus = 0): Outcome {
       if (out.turnover) break;
     }
   }
+  if (spD?.type === 'cap' && spO?.type !== 'skip') { cap = Math.min(cap, spD.v); notes.push(`${spD.name}: their shot cannot be better than ${spD.v}%.`); }
   if (clutch) extra.push(['Clutch', clutchBonus]);
   const ctx: ShotCtx = { guard: P.guard, card, dcard, extra, dt: iso ? null : P.dt };
   const ch = chance(G, s, shooter, zone, ctx);
   out.read = ch.read;
   out.passer = ch.passer;
-  out.parts = ch.parts;
+  if (ch.passer != null && S.team[ch.passer]) out.passerId = S.team[ch.passer].id;
+  if (out.dt && S.team[out.dt.mark]) out.dtMarkId = S.team[out.dt.mark].id;
+  out.parts = ch.parts.slice();
+  out.base = ch.base;
   let p = ch.p;
-  if (blocked) p = T.blockP;
-  else if (cap < 100) p = Math.min(p, cap);
-  p = Math.max(Math.min(1, T.blockP), p);
+  const adj = (name: string, to: number): void => { if (to !== p) { out.parts.push([name, Math.round((to - p) * 10) / 10]); p = to; } };
+  if (blocked) adj('Blocked', T.blockP);
+  else if (cap < 100) adj('Capped', Math.min(p, cap));
+  adj('Minimum chance', Math.max(Math.min(1, T.blockP), p));
   out.p = p;
   out.blocked = blocked;
   if (ch.read) notes.push(`Their ${SCHEME_NAME[P.guard!]} guessed ${zoneWord(zone)}: the shot loses ${Math.round((1 - ch.factor) * 100)}%.`);
@@ -656,8 +730,20 @@ export function resolve(G: CGame, clutchBonus = 0): Outcome {
       if ((pbCard && rnd() * 100 < pbCard && rnd() * 100 < p) || (pbShoe && rnd() * 100 < pbShoe)) { out.made = true; out.putback = true; notes.push(`${b.name} follows his own miss: putback.`); }
     }
   }
+  let forkPts = 0;
+  if (!out.turnover && !out.made && !blocked && spO?.type === 'fork') {
+    const alt = S.team.map((_b, i) => i).filter((i) => i !== shooter).sort((x, y) => top(S.team[y]) - top(S.team[x]))[0];
+    if (alt != null) {
+      const ab = S.team[alt], z2 = ZONES.reduce((bz, z) => (rating(ab, z) * (z === 'three' ? 0.95 : 1) > rating(ab, bz) * (bz === 'three' ? 0.95 : 1) ? z : bz), 'mid' as Zone);
+      const c2 = chance(G, s, alt, z2, { guard: null, card: null, dcard: null, extra: [['Fork', spO.v]], dt: null });
+      out.fork = { shooter: alt, id: ab.id, zone: z2, p: c2.p };
+      if (rnd() * 100 < c2.p) { out.made = true; out.putback = true; forkPts = ZONE_PTS[z2]; notes.push(`${spO.name}: ${ab.name} takes the second shot from ${zoneWord(z2)} (${c2.p}%) and it goes in.`); }
+      else notes.push(`${spO.name}: ${ab.name} takes the second shot (${c2.p}%) and misses.`);
+    }
+  }
   const worth = card && (!card.fx.only || card.fx.only.includes(zone)) ? card.fx.worth || 0 : 0;
-  out.pts = out.made ? (out.putback ? 2 : ZONE_PTS[zone] + worth) : 0;
+  out.pts = out.made ? (forkPts || (out.putback ? 2 : ZONE_PTS[zone] + worth)) + (spO?.type === 'worth' ? 1 : 0) : 0;
+  if (out.made && spO?.type === 'worth') notes.push(`${spO.name}: the basket is worth +1.`);
   if (out.made && zone === 'rim' && !out.putback) {
     const a1 = andOneChance(b, O.team[defIdx].def, !out.read && !iso && P.guard != null && P.guard !== zone);
     out.a1p = a1;
@@ -694,12 +780,15 @@ export function resolve(G: CGame, clutchBonus = 0): Outcome {
   }
   out.fireOn = !wasFire && b.streak >= 2;
   S.lastMadeThree = out.made && zone === 'three';
-  out.extra = !!card?.fx.extra;
+  out.extra = !!card?.fx.extra || (spO?.type === 'loop' && out.made);
+  if (out.extra && spO?.type === 'loop') notes.push(`${spO.name}: the ball stays with you.`);
   P.extra = out.extra;
+  P.done = true;
   if (card) S.discard.push(card);
   if (countered) S.discard.push(P.offCard!);
   if (dcard) O.discard.push(dcard);
   G.last = out;
+  moSync(G);
   const who = s === 0 ? 'You' : 'CPU';
   const line = out.turnover ? `${who}: turnover (${out.turnover})` : `${who}: ${b.name} ${zoneWord(zone)} ${out.p}%${out.read ? ' (read)' : ''} ${out.made ? '+' + out.pts + (out.andOne ? ' AND ONE' : '') + (out.label ? ' ' + out.label : '') : out.blocked ? 'blocked' : 'miss'}`;
   G.log.push(line);
@@ -727,8 +816,102 @@ export function cycleMatch(G: CGame, s: Side, offIdx: number): void {
 }
 export function nextPossession(G: CGame): void {
   if (G.over) return;
-  startPossession(G, G.poss.extra ? G.poss.off : ((1 - G.poss.off) as Side));
+  const A = G.sides[G.poss.off];
+  const keep = G.poss.extra || A.again;
+  if (A.again) A.again = false;
+  startPossession(G, keep ? G.poss.off : ((1 - G.poss.off) as Side));
 }
+
+// ---------- Iconic specials ----------
+const SP_BOUND_BLOCK: SpType[] = ['sure', 'skip', 'fork', 'loop', 'worth', 'ignite'];
+/** Can the special of the Baller in court slot `idx` of side `s` be used right now? Returns the reason it cannot, or null. */
+export function specialBlock(G: CGame, s: Side, idx: number): string | null {
+  const S = G.sides[s], O = G.sides[(1 - s) as Side], b = S.team[idx], P = G.poss;
+  if (!T.spOn) return 'Specials are switched off.';
+  if (!b) return 'Only a Baller on court can use it.';
+  const sp = b.special;
+  if (!sp) return 'He has no special.';
+  if (b.spUsed) return 'Used this game.';
+  const k = SP_KINDS[sp.type];
+  if (k.when === 'after') {
+    const L = G.last;
+    if (!P.done || P.off === s || !L || L.side === s || !L.made || L.rewound || L.pts <= 0) return 'Use it right after they score.';
+    if (G.over && G.n >= T.possCap) return 'The game is over.';
+    return null;
+  }
+  if (G.over) return 'The game is over.';
+  if (P.done) return 'Wait for the next possession.';
+  if (P.sp[s]) return 'One special per possession.';
+  if (k.when === 'off' && P.off !== s) return 'Use it on offense.';
+  if (k.when === 'def' && P.off === s) return 'Use it on defense.';
+  const off = P.off === s;
+  if (SP_BOUND_BLOCK.includes(sp.type)) {
+    if (P.offCard?.fx.fixed || P.offCard?.fx.iso) return 'Not with this card in play.';
+    if (P.dt && P.dt.mark === idx) return 'He is double teamed.';
+  }
+  switch (sp.type) {
+    case 'surge': if (S.mo >= T.moMax) return 'Momentum is full.'; break;
+    case 'drain': if (O.mo <= 0) return 'They have no Momentum.'; break;
+    case 'null': if (off && !O.traps.length) return 'They have no Traps.'; break;
+    case 'flush': if (!S.team.some((x) => x.hold > 0 || x.run >= FATIGUE.start - 1)) return 'Nobody needs it yet.'; break;
+    case 'cool': if (O.team.every((x) => x.hold > spValue(sp, b.holo))) return 'They are all cooling already.'; break;
+  }
+  return null;
+}
+/** Uses the special of the Baller in court slot `idx`: no Momentum cost, once per game. Returns false when it cannot be used. */
+export function useSpecial(G: CGame, s: Side, idx: number): boolean {
+  if (specialBlock(G, s, idx)) return false;
+  const S = G.sides[s], O = G.sides[(1 - s) as Side], b = S.team[idx], P = G.poss, sp = b.special!;
+  const v = spValue(sp, b.holo), k = SP_KINDS[sp.type], who = s === 0 ? 'You' : 'CPU';
+  const fx: SpFx = { type: sp.type, v, idx, name: sp.name, holo: b.holo };
+  moSync(G);
+  b.spUsed = true;
+  G.box.sp.push({ n: G.n, side: s, id: b.id, name: sp.name, holo: !!b.holo });
+  const detail: string[] = [specialText(sp, b.holo), 'Once per game, no Momentum cost.'];
+  if (b.holo && T.spHoloMo) { S.mo = Math.min(T.moMax, S.mo + T.spHoloMo); detail.push(`HOLO: +${T.spHoloMo} Momentum.`); }
+  if (sp.type !== 'rewind') P.sp[s] = fx;
+  if (k.bound) { P.shooter = idx; }
+  switch (sp.type) {
+    case 'ignite': b.streak = Math.max(2, b.streak); break;
+    case 'firewall': if (P.dt) { P.dt = null; P.dtPaid = 0; } break;
+    case 'null':
+      O.discard.push(...O.traps.splice(0));
+      S.mo = Math.min(T.moMax, S.mo + v);
+      break;
+    case 'cool': {
+      const t = O.team.reduce((bi, x, i) => (top(x) > top(O.team[bi]) ? i : bi), 0);
+      O.team[t].hold = Math.max(O.team[t].hold, v + 1);
+      detail.push(`${O.team[t].name} sits out ${v} attacks.`);
+      break;
+    }
+    case 'drain': O.mo = Math.max(0, O.mo - v); S.mo = Math.min(T.moMax, S.mo + Math.floor(v / 2)); break;
+    case 'surge': S.mo = Math.min(T.moMax, S.mo + v); break;
+    case 'flush': for (const x of S.team) { x.run = 0; x.hold = 0; } break;
+    case 'draw': draw(S, v); S.discount = true; S.mo = Math.min(T.moMax, S.mo + 1); break;
+    case 'rewind': {
+      // cancels up to v points of their last basket; only a fully cancelled basket takes its Momentum back
+      const L = G.last!, sh = O.team[L.shooter], cut = Math.min(L.pts, Math.max(1, Math.round(v)));
+      O.score = Math.max(0, O.score - cut);
+      L.pts -= cut;
+      if (L.pts <= 0) {
+        O.mo = Math.max(0, O.mo - T.moBasket - (L.andOne ? 1 : 0));
+        if (sh) sh.streak = 0;
+        L.rewound = true;
+      }
+      if (G.over && G.winner !== null && G.sides[G.winner].score < T.winTo) { G.over = false; G.winner = null; }
+      detail.push(`${cut} point${cut === 1 ? '' : 's'} come off their score. The ball is yours.`);
+      break;
+    }
+  }
+  const line = `${who}: ${b.name} uses ${sp.name}${b.holo ? ' (HOLO)' : ''}`;
+  G.log.push(line);
+  G.feed.push({ n: G.n, side: s, kind: 'info', text: line, detail });
+  G.spq.push({ side: s, idx, name: sp.name, type: sp.type, text: specialText(sp, b.holo), holo: b.holo, flavor: sp.flavor });
+  return true;
+}
+/** Specials this side could use now, as court slots. */
+export const readySpecials = (G: CGame, s: Side): number[] => G.sides[s].team.map((_b, i) => i).filter((i) => G.sides[s].team[i].special && !specialBlock(G, s, i));
+
 export const canClutch = (G: CGame, s: Side): boolean => G.poss.off === s && G.sides[s].mo >= T.moMax && !G.poss.offCard?.fx.fixed;
 
 // ---------- AI ----------
@@ -866,7 +1049,7 @@ export function aiSubs(G: CGame, s: Side, k: AiSkill): void {
   }));
   if (best) doSub(G, s, best[0], best[1]);
 }
-export function aiOffense(G: CGame, s: Side, k: AiSkill): void {
+function aiOffenseCore(G: CGame, s: Side, k: AiSkill): void {
   const S = G.sides[s], P = G.poss;
   const opts0 = options(G, s);
   let opts = opts0;
@@ -924,7 +1107,7 @@ export function aiOffense(G: CGame, s: Side, k: AiSkill): void {
   }
   if (canClutch(G, s)) P.clutch = true;
 }
-export function aiDefense(G: CGame, s: Side, k: AiSkill): void {
+function aiDefenseCore(G: CGame, s: Side, k: AiSkill): void {
   const off = (1 - s) as Side, P = G.poss, S = G.sides[s];
   aiMatchups(G, s, k);
   // the double team is visible, so decide it first
@@ -938,6 +1121,74 @@ export function aiDefense(G: CGame, s: Side, k: AiSkill): void {
   const choice = rnd() < (1 - k.smart) * 0.4 ? null : chooseCard(G, s, null, k);
   if (choice) playCard(G, s, choice.i, choice.target);
 }
+// ---------- AI: Iconic specials ----------
+/** How much the game hangs on this moment, 0..1.2: the leader's progress to the target, a close score adds a little. */
+function leverage(G: CGame, s: Side): number {
+  const S = G.sides[s], O = G.sides[(1 - s) as Side];
+  return Math.min(1.2, Math.max(S.score, O.score) / T.winTo + (Math.abs(S.score - O.score) <= 4 ? 0.15 : 0));
+}
+/** Rough expected points a special adds right now (offense: over his normal best look; defense: off their best look). */
+function spGain(G: CGame, s: Side, idx: number): { gain: number; zone?: Zone } {
+  const S = G.sides[s], O = G.sides[(1 - s) as Side], b = S.team[idx], sp = b.special!, v = spValue(sp, b.holo), P = G.poss;
+  const off = P.off === s, t = sp.type;
+  if (off && SP_KINDS[t].group === 'off') {
+    const look = ZONES.map((z) => {
+      const open = chance(G, s, idx, z, { guard: null, card: P.offCard, dcard: null, extra: [], dt: P.dt }).p;
+      const read = chance(G, s, idx, z, { guard: z, card: P.offCard, dcard: null, extra: [], dt: P.dt }).p;
+      return { z, open, read, ev: (ZONE_PTS[z] * (open * 2 + read)) / 300 };
+    }).sort((a, c) => c.ev - a.ev);
+    const base = options(G, s, P.offCard)[0]?.ev ?? look[0].ev, L = look[0];
+    switch (t) {
+      case 'sure': { const z = ZONES.map((zz) => ({ zz, e: (ZONE_PTS[zz] * (0.67 * v + 0.33 * look.find((x) => x.z === zz)!.read)) / 100 })).sort((a, c) => c.e - a.e)[0]; return { gain: z.e - base, zone: z.zz }; }
+      case 'skip': return { gain: (ZONE_PTS[L.z] * (L.open + v)) / 100 - base + O.traps.length * 0.3, zone: L.z };
+      case 'fork': return { gain: (L.ev - base) + (1 - L.open / 100) * 0.8, zone: L.z };
+      case 'loop': return { gain: L.ev - base + (L.open / 100) * 1.3, zone: L.z };
+      case 'worth': return { gain: L.ev - base + L.open / 100 + v * 0.02, zone: L.z };
+      case 'ignite': return { gain: L.ev - base + 0.3 + v * 0.02, zone: L.z };
+      case 'firewall': return { gain: L.ev - base + (P.dt ? 0.45 : 0) + O.traps.length * 0.4 + v * 0.01, zone: L.z };
+    }
+  }
+  if (!off && SP_KINDS[t].group === 'def') {
+    const bp = options(G, (1 - s) as Side)[0];
+    const pts = bp ? ZONE_PTS[bp.zone] : 2.4, open = bp ? bp.open : 50;
+    switch (t) {
+      case 'stop': return { gain: (v / 100) * pts };
+      case 'trace': return { gain: (open * v * pts) / 10000 };
+      case 'steal': return { gain: (v / 100) * (bp?.ev ?? 1.3) };
+      case 'cap': return { gain: (Math.max(0, open - v) / 100) * pts };
+    }
+  }
+  switch (t) {
+    case 'null': return { gain: O.traps.length * 0.5 + (off ? 0 : 0.2) + v * 0.05 };
+    case 'cool': { const best = O.team.reduce((m, x) => (top(x) > top(m) ? x : m)); return { gain: off ? 0.1 : best.hold <= 0 ? 0.6 : 0.05 }; }
+    case 'drain': return { gain: O.mo >= 5 ? 0.15 * v : 0.05 * v };
+    case 'surge': return { gain: S.mo + v <= T.moMax ? 0.12 * v + (S.mo <= 4 ? 0.2 : 0) : 0.05 * v };
+    case 'flush': return { gain: S.team.reduce((a, x) => a + (x.hold > 0 ? 0.3 : 0) + (fatigueOf(x) >= 3 ? 0.2 : 0), 0) };
+    case 'draw': return { gain: Math.min(v, HAND_MAX - S.hand.length) * 0.16 + 0.3 };
+    case 'rewind': return { gain: Math.min(G.last?.pts ?? 0, v) * 0.85 + 0.15 };
+  }
+  return { gain: 0 };
+}
+/** The CPU uses at most one special per possession, and only when it is worth it: leverage and expected gain decide, and it is never left unused at the end. */
+function aiSpecial(G: CGame, s: Side, k: AiSkill, after = false): boolean {
+  if (!T.spOn) return false;
+  const lev = leverage(G, s), thr = 0.62 - 0.18 * k.smart;
+  let best = -1, bz: Zone | undefined, br = 0;
+  G.sides[s].team.forEach((b, i) => {
+    if (!b.special || (SP_KINDS[b.special.type].when === 'after') !== after || specialBlock(G, s, i)) return;
+    const r = spGain(G, s, i), rate = r.gain * (0.65 + lev) + (rnd() - 0.5) * (1 - k.smart) * 0.3;
+    const force = lev >= 0.95 && r.gain > 0.25;
+    if ((rate >= thr || force) && rate + (force ? 1 : 0) > br) { br = rate + (force ? 1 : 0); best = i; bz = r.zone; }
+  });
+  if (best < 0) return false;
+  if (!useSpecial(G, s, best)) return false;
+  if (bz && SP_KINDS[G.sides[s].team[best].special!.type].bound) { G.poss.shooter = best; G.poss.zone = bz; }
+  return true;
+}
+/** Rewind is the one special used after the shot: call it once the other side's basket has been resolved. */
+export function aiRewind(G: CGame, s: Side, k: AiSkill): boolean { return aiSpecial(G, s, k, true); }
+export function aiOffense(G: CGame, s: Side, k: AiSkill): void { aiOffenseCore(G, s, k); aiSpecial(G, s, k); }
+export function aiDefense(G: CGame, s: Side, k: AiSkill): void { aiDefenseCore(G, s, k); aiSpecial(G, s, k); }
 /** Where a tapper with timing error sigma stops the Clutch needle; returns the bonus. */
 export function clutchTap(sigma: number): number {
   const u = Math.max(1e-9, rnd()), v = rnd();
@@ -954,6 +1205,7 @@ export function simPossession(G: CGame, skills: [AiSkill, AiSkill]): Outcome {
   aiDefense(G, d, skills[d]);
   aiOffense(G, s, skills[s]);
   const o = resolve(G, G.poss.clutch ? clutchTap(skills[s].sigma) : 0);
+  if (o.made) aiRewind(G, d, skills[d]);
   nextPossession(G);
   return o;
 }

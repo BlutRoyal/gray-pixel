@@ -14,7 +14,7 @@ const RUNS = +(process.argv[2] || 2000), GAMES = +(process.argv[3] || 40);
 // Play-time model: a game of ~30 possessions at ~9 s of tapping and animation each, plus ~90 s of menus, rewards and pack opening.
 const SEC_PER_POSS = 9, OVERHEAD_S = 90;
 const f1 = (x: number) => x.toFixed(1), f0 = (x: number) => Math.round(x).toLocaleString('en');
-const pct = (x: number) => (x * 100 >= 10 ? (x * 100).toFixed(0) : x * 100 >= 1 ? (x * 100).toFixed(1) : (x * 100).toFixed(2)) + '%';
+const pct = (x: number) => (x * 100 >= 10 ? (x * 100).toFixed(0) : x * 100 >= 1 ? (x * 100).toFixed(1) : x * 100 >= 0.01 ? (x * 100).toFixed(2) : (x * 100).toFixed(4)) + '%';
 const median = (a: number[]) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
 const p90 = (a: number[]) => a.slice().sort((x, y) => x - y)[Math.floor(a.length * 0.9)];
 
@@ -65,18 +65,26 @@ console.log('\n== Shards');
 console.log('Duplicate yield: ' + TIERS.map((t) => `${TIER_NAME[t]} ${SHARD_YIELD[t]}`).join(', '));
 console.log('To max one Baller (level 1 to 5): ' + TIERS.map((t) => `${TIER_NAME[t]} ${f0(maxCost(t))}`).join(', ') + `   (first step: ${TIERS.map((t) => levelCost(t, 1)).join('/')})`);
 {
-  // 200 Pro packs: how many shards do duplicates give? Only Play cards past 2 copies (1 for Iconic) and repeat Ballerz count.
-  for (const id of ['street', 'pro', 'icon']) {
+  // Shards from duplicates. Ballerz and Sneakerz feed the shared pool (levels); a Play card beyond its copies feeds THAT card only.
+  // Packs now hold 2 Ballerz + 3 Play cards, so the pool income fell and the card-shard income rose.
+  for (const id of ['basic', 'street', 'pro', 'icon']) {
     const d = packDef(id), have = new Map<string, number>(), N = 300;
-    let sh = 0, at50 = 0, at100 = 0;
+    let pool = 0, card = 0, p50 = 0, c50 = 0, p100 = 0, c100 = 0;
     for (let n = 1; n <= N; n++) {
       for (const p of openPack(d, { pity: !!d.pity && n % d.pity.every === 0 })) {
         const c = have.get(p.key) || 0;
-        if (c >= keepCopies(p.key, p.tier)) sh += SHARD_YIELD[p.tier]; else have.set(p.key, c + 1);
+        if (c >= keepCopies(p.key, p.tier)) { if (p.key[0] === 'p') card += SHARD_YIELD[p.tier]; else pool += SHARD_YIELD[p.tier]; } else have.set(p.key, c + 1);
       }
-      if (n === 50) at50 = sh; if (n === 100) at100 = sh;
+      if (n === 50) { p50 = pool; c50 = card; } if (n === 100) { p100 = pool; c100 = card; }
     }
-    console.log(`${d.name.padEnd(12)} shards from duplicates: ${f0(at50)} after 50 packs, ${f0(at100)} after 100, ${f0(sh)} after ${N} (about ${f1(sh / N)} per pack, ${f1(sh / N / d.price * 100)} per 100 Bucks)`);
+    console.log(`${d.name.padEnd(12)} shared-pool shards ${f0(p50)} after 50 packs, ${f0(p100)} after 100, ${f0(pool)} after ${N} (${f1(pool / N)} per pack, ${f1(pool / N / d.price * 100)} per 100 Bucks) · card-only shards ${f0(c50)} / ${f0(c100)} / ${f0(card)} (${f1(card / N)} per pack)`);
+  }
+  {
+    // the free daily Basic Pack: 30 days of claims
+    const d = packDef('basic'), have = new Map<string, number>();
+    let pool = 0, card = 0;
+    for (let n = 0; n < 30; n++) for (const p of openPack(d)) { const c = have.get(p.key) || 0; if (c >= keepCopies(p.key, p.tier)) { if (p.key[0] === 'p') card += SHARD_YIELD[p.tier]; else pool += SHARD_YIELD[p.tier]; } else have.set(p.key, c + 1); }
+    console.log(`Free daily Basic Pack, 30 days of claims: ${f0(pool)} shared-pool shards, ${f0(card)} card-only shards (worth ${f0(30 * d.price)} Bucks at shop price)`);
   }
 }
 
@@ -151,3 +159,23 @@ for (const d of BALLER_PACKS) {
 const sh = out.reduce((a, o) => a + o.s, 0) / out.length;
 console.log(`Max one Baller: ${TIERS.map((t) => `${TIER_NAME[t]} ${f1(maxCost(t) / (sh || 1))} h`).join(', ')} (shards from games only, ${f0(sh)}/h)`);
 void daily;
+
+// Does the free daily Basic Pack trivialise paid packs? A player who plays 1 hour a day, buys Pro Packs with all the Bucks, and (maybe) claims the free pack.
+{
+  const days = (daily: boolean): number => {
+    let sum = 0;
+    const R = 600;
+    for (let r = 0; r < R; r++) {
+      let bucks = 0, d = 0, pro = 0, found = false;
+      while (!found && d < 4000) {
+        d++; bucks += inc;
+        if (daily && openPack(packDef('basic')).some((p) => p.kind === 'baller' && tierRank(p.tier) >= tierRank('epic'))) found = true;
+        while (!found && bucks >= packDef('pro').price) { bucks -= packDef('pro').price; pro++; if (openPack(packDef('pro'), { pity: pro % 10 === 0 }).some((p) => p.kind === 'baller' && tierRank(p.tier) >= tierRank('epic'))) found = true; }
+      }
+      sum += d;
+    }
+    return sum / R;
+  };
+  const a = days(false), b = days(true);
+  console.log(`\nFirst Epic+ Baller for a player doing 1 h/day and buying Pro Packs: ${f1(a)} days without the free daily pack, ${f1(b)} days with it (${f1((1 - b / a) * 100)}% faster). A daily Basic Pack alone: Epic+ in about ${f0(1 / packChance(packDef('basic'), 'epic'))} days.`);
+}

@@ -6,6 +6,10 @@ import { TUNING, CLUTCH, CLUTCH_NAME, COACH_PERK, FATIGUE, HAND_MAX, HAND_START,
 import { allCards } from '../casual/cards';
 import { STAGES } from '../casual/story';
 import { esc, heroImg } from './views';
+import { HOLO_ICONIC } from '../casual/packs';
+
+/** 2.00 -> 2%, 0.0005 -> 0.0005%: enough digits to show the first significant one. */
+const fmtPct = (x: number): string => `${x >= 1 ? +x.toFixed(1) : x >= 0.01 ? +x.toFixed(2) : +x.toPrecision(2)}%`;
 
 const nav: [string, string][] = [['basics', 'The basics'], ['turn', 'A possession'], ['shots', 'Shots'], ['cards', 'Cards'], ['coaches', 'Coaches'], ['story', 'Story'], ['packs', 'Packs'], ['plan', 'The plan']];
 
@@ -54,7 +58,10 @@ export function howHTML(): string {
     <li>The first win of every day pays a bonus that grows with your daily streak. Quick Play pays ${QUICK_WIN} Bucks for a win, ${QUICK_LOSS} for a loss.</li></ul></article>
 
   <article class="panel prose" id="h-packs"><h2 class="h">Packs and levels</h2>
-    <ul>${PACKS.map((p) => `<li><b>${esc(p.name)}</b> (${p.price} Bucks): ${esc(p.blurb)} ${isBox(p) ? '' : `Epic or better ${(packChance(p, 'epic') * 100).toFixed(1)}% per pack, Iconic ${(packChance(p, 'iconic') * 100).toFixed(2)}%.`}</li>`).join('')}
+    <ul>${PACKS.map((p) => `<li><b>${esc(p.name)}</b> (${p.price} Bucks): ${esc(p.blurb)} ${isBox(p) ? '' : `Epic or better ${(packChance(p, 'epic') * 100).toFixed(1)}% per pack, Iconic ${fmtPct(packChance(p, 'iconic') * 100)}.`}</li>`).join('')}
+    <li>Street, Pro and Icon packs hold 5 cards: 2 Ballerz and 3 Play cards. The Basic Pack costs 25 Bucks and you can also claim one free every day (local day, button on the title and Packs screens). It is mostly Common and Uncommon, with no pity.</li>
+    <li>Opening is manual: each card sits face down (edge colour, glow and sparks hint at its tier), a click flips it, a click after that only tilts it, and NEXT CARD moves on. Nothing flips by itself.</li>
+    <li><b class="ic-txt">Iconic specials:</b> each of the ${RANK_CUTS.iconic} Iconic Ballerz has one special move, usable once per game from his card or token for no Momentum, once per possession per side. It greys out after use and resets next game. About ${Math.round(HOLO_ICONIC * 100)}% of Iconic pulls are <b>HOLO</b>: the same Baller with a glitching frame and a stronger special. Pulling a HOLO of one you own as normal replaces it, and the normal turns into shards.</li>
     <li>Baller rarity comes from his rank. All Ballerz are ranked by the mean of their three best stats among DNK, SHT, PLY and DEF: the top ${RANK_CUTS.iconic} are <b class="ic-txt">Iconic</b>, the next ${RANK_CUTS.legendary} Legendary, the next ${RANK_CUTS.epic} Epic, and the rest Rare, Uncommon and Common.</li>
     <li>Sneakerz keep their own rarity. A Custom Sneaker counts as Legendary with Bullseye (+8%), Epic with another enhancement (+3%) and Rare without one (+2%): only Bullseye Customs are good.</li>
     <li>A duplicate Baller or Sneaker turns into shards (${TIERS.map((t) => `${TIER_NAME[t]} ${SHARD_YIELD[t]}`).join(', ')}). Shards level a Baller from 1 to ${LEVEL_MAX}: +1 to every stat per level. Recycle sells shards for Bucks.</li>

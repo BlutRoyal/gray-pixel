@@ -104,8 +104,8 @@ const LEGENDARY: Record<Pos, Skill[]> = {
   B: [mk('l_poster', 'Posterizer', 'legendary', { zone: { rim: 6 }, mo: 1, moZone: 'rim' }), mk('l_fortress', 'Fortress', 'legendary', { stop: { rim: 8, mid: 4 } })],
 };
 const ICONIC: Record<Pos, Skill[]> = {
-  G: [mk('i_glitchstep', 'Glitch Step', 'iconic', { ignore: ['mid'], zone: { mid: 3 } }, 'Mid shot ignores Drop. +3% on his Mid shots.'), mk('i_frameskip', 'Frame Skip', 'iconic', { ignore: ['rim'], zone: { rim: 2 } }, 'Rim shot ignores Pack the Paint. +2% on his Rim shots.')],
-  W: [mk('i_nullptr', 'Null Pointer', 'iconic', { ignore: ['three'], zone: { three: 3 } }, 'Three ignores Close Out. +3% on his Three shots.'), mk('i_overflow', 'Overflow', 'iconic', { all: 3, mo: 2 }, '+3% on all his shots. His baskets give +2 extra Momentum.')],
+  G: [mk('i_glitchstep', 'Hitch Step', 'iconic', { ignore: ['mid'], zone: { mid: 3 } }, 'Mid shot ignores Drop. +3% on his Mid shots.'), mk('i_frameskip', 'Dropped Frame', 'iconic', { ignore: ['rim'], zone: { rim: 2 } }, 'Rim shot ignores Pack the Paint. +2% on his Rim shots.')],
+  W: [mk('i_nullptr', 'Dangling Pointer', 'iconic', { ignore: ['three'], zone: { three: 3 } }, 'Three ignores Close Out. +3% on his Three shots.'), mk('i_overflow', 'Overflow', 'iconic', { all: 3, mo: 2 }, '+3% on all his shots. His baskets give +2 extra Momentum.')],
   B: [mk('i_memleak', 'Memory Leak', 'iconic', { zone: { rim: 4 }, drain: 2 }, '+4% on his Rim shots. His baskets drain 2 Momentum from the other team.'), mk('i_segfault', 'Segfault', 'iconic', { stopAll: 5, stop: { rim: 5 } }, 'The man he guards gets −5% on every shot and −10% at the Rim.')],
 };
 /** The passive skill of a Baller. Deterministic from id, position and tier. */

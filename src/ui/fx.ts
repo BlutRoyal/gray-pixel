@@ -153,6 +153,21 @@ export function freeThrow(from: XY, to: XY, tone: Tone): void {
   ], { duration: 650 * speed, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'forwards' });
   setTimeout(() => { swish(to, tone); callout('+1', null, tone, 'free throw', true); }, 640 * speed);
 }
+/** Win effect for the reward screen: neon rings and falling confetti, scaled by the winning margin. Cheaper in lite mode, none with reduced motion. */
+export function winFx(margin: number): void {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const lite = liteOn(), m = Math.max(0, margin);
+  const root = document.createElement('div');
+  root.className = 'winfx';
+  root.setAttribute('aria-hidden', 'true');
+  const rings = lite ? 1 : m >= 10 ? 3 : m >= 5 ? 2 : 1;
+  let html = Array.from({ length: rings }, (_x, k) => `<i class="wf-ring" style="--d:${k * 0.22}s"></i>`).join('');
+  const n = Math.round(Math.min(150, 36 + m * 8) / (lite ? 3 : 1)), cols = ['#19f6ff', '#ff4fd8', '#ffb000', '#ffffff', '#b48cff'];
+  for (let i = 0; i < n; i++) html += `<b class="wf-c" style="--x:${Math.round(Math.random() * 100)}vw;--w:${3 + Math.round(Math.random() * 5)}px;--c:${cols[i % cols.length]};--t:${(1.6 + Math.random() * 1.8).toFixed(2)}s;--dl:${(Math.random() * 0.9).toFixed(2)}s;--r:${Math.round(Math.random() * 720 - 360)}deg;--s:${Math.round(Math.random() * 120 - 60)}px"></b>`;
+  root.innerHTML = html;
+  document.body.appendChild(root);
+  setTimeout(() => root.remove(), 4200);
+}
 export function flash(tone: Tone): void {
   add(`fx-flash t-${tone}`, '', undefined, undefined, 500);
 }

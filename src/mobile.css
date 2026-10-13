@@ -4,7 +4,8 @@
 
 /* ---------- portraits (real image over a pixel avatar) ---------- */
 .pt { position: relative; display: block; flex: 0 0 auto; width: 36px; aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 2px solid var(--ring, var(--cyan));
-  background: var(--av, none) center / cover no-repeat, radial-gradient(circle at 50% 35%, hsl(var(--hue, 170) 70% 45%), hsl(var(--hue, 170) 45% 12%) 78%); image-rendering: pixelated; }
+  background: radial-gradient(circle at 50% 35%, hsl(var(--hue, 170) 70% 45%), hsl(var(--hue, 170) 45% 12%) 78%); image-rendering: pixelated; }
+.pt.avfb { background: var(--av) center / cover no-repeat, #0a0e22; image-rendering: pixelated; }
 .pt img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; image-rendering: auto; }
 .pt.sm { width: 32px; border-width: 2px; } .pt.md { width: 52px; } .pt.xl { width: 84px; border-width: 3px; }
 .tok-img.pt { width: clamp(40px, 12.5cqw, 76px); }

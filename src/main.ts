@@ -18,17 +18,20 @@ import { installUnlock, sfx, unlock, getAudio, type SfxName } from './ui/sfx';
 import { initMusic, loadMusicFiles, setMusicScene } from './ui/music';
 import { soundAct, speakerIcon, soundOpen } from './ui/sound';
 import { BOOT_LINES, GAME_TAGLINE, SPLASH_PROMPT, SPLASH_HINT } from './ui/lore';
-import { esc } from './ui/views';
+import { esc, loadedImgs, failedImgs, ballerFromId } from './ui/views';
+import { avatar } from './ui/avatar';
 import { tutSync, tutorialAct } from './ui/tutorial';
-import { profile } from './ui/store';
+import { migrateHolo, profile } from './ui/store';
 import { bindTilt } from './ui/views';
 import { strayHTML, wordmarkSVG } from './ui/wordmark';
 import './gray.css';
 import './mobile.css';
 import './lite.css';
 import './sound.css';
+import './round3.css';
 
 loadCatalog(catalogData as Catalog);
+migrateHolo();
 
 type Tab = 'play' | 'story' | 'packs' | 'collection' | 'deck' | 'how' | 'lab';
 const TABS: [Tab, string][] = [['play', 'Play'], ['story', 'Story'], ['packs', 'Packs'], ['collection', 'Collection'], ['deck', 'Deck'], ['how', 'How'], ['lab', 'Lab']];
@@ -126,10 +129,20 @@ document.addEventListener('keydown', (e) => {
 });
 // Real Ballerz and Sneakerz images come from ballerz.cloud. When a host blocks them (or you're offline), the image is dropped
 // and its frame gets .noimg, which shows the card number (Ballerz) or a drawn shoe (Sneakerz) on the team-colour background.
+document.addEventListener('load', (e) => {
+  const t = e.target;
+  if (t instanceof HTMLImageElement && t.dataset.fb) { loadedImgs.add(t.src); t.classList.add('ld'); }
+}, true);
 document.addEventListener('error', (e) => {
   const t = e.target;
   if (!(t instanceof HTMLImageElement)) return;
-  if (t.dataset.fb) { t.parentElement?.classList.add('noimg'); t.remove(); }
+  if (t.dataset.av) {
+    // Real image failed: only now draw the trait-built pixel avatar as the fallback face.
+    const host = t.parentElement;
+    failedImgs.add(t.src);
+    try { if (host) { host.style.setProperty('--av', `url(${avatar(ballerFromId(+t.dataset.av))})`); host.classList.add('avfb'); } } catch { host?.classList.add('noimg'); }
+    t.remove();
+  } else if (t.dataset.fb) { t.parentElement?.classList.add('noimg'); t.remove(); }
   else if (t.dataset.fbText) { const span = document.createElement('span'); span.textContent = t.dataset.fbText; t.replaceWith(span); }
 }, true);
 bindTilt(app);

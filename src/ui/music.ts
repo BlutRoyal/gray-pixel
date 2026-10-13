@@ -9,13 +9,13 @@ import { MUSIC_TRIMS } from './trims';
 
 export type MusicCtx = TrackName;
 export const MUSIC_CTXS: MusicCtx[] = ['title', 'game', 'pack'];
-const PATH: Record<MusicCtx, string> = { title: 'audio/title.mp3', game: 'audio/game.mp3', pack: 'audio/pack.mp3' };
+const PATH: Partial<Record<MusicCtx, string>> = { title: 'audio/title.mp3', game: 'audio/game.mp3', pack: 'audio/pack.mp3' };
 const DB = 'ballerz_audio';
 
 let base: MusicCtx | null = null;
 let override: MusicCtx | 'none' | null = null;
 let test: MusicCtx | null = null;
-let tension = 0.2, cur = 0.2, boostBars = 0;
+let tension = 0.2, cur = 0.2, boostBars = 0, fanI = 0.5;
 
 interface Playing { name: MusicCtx; kind: 'synth' | 'file'; stop(): void; setVol?(): void }
 let playing: Playing | null = null;
@@ -76,7 +76,12 @@ function audible(): boolean {
 }
 export function setMusicScene(b: MusicCtx | null): void { if (b !== base) { base = b; sync(); } }
 /** The pack opening takes over ('pack', or 'none' when its music toggle is off); null hands back to the scene. */
-export function setMusicOverride(o: MusicCtx | 'none' | null): void { if (o !== override) { override = o; sync(); } }
+export function setMusicOverride(o: MusicCtx | 'none' | null, level?: number): void {
+  if (level != null) fanI = Math.max(0, Math.min(1, level));
+  if (o !== override) { override = o; sync(); }
+}
+/** Fanfare loop for a big moment (an Iconic pull, a win): `level` 0.5 normal, 1 = HOLO Iconic or a big win. null hands back to the scene. It plays only after the first gesture and follows the music volume and mute. */
+export function setFanfare(on: boolean, level = 0.5): void { setMusicOverride(on ? 'triumph' : null, level); }
 export function setMusicTest(c: MusicCtx | null): void { test = c; sync(); }
 export const musicTest = (): MusicCtx | null => test;
 /** How tense the game loop is, 0..1 (Momentum). */
@@ -95,7 +100,7 @@ function sync(): void {
 function stopPlaying(fast: boolean): void { const p = playing; playing = null; p?.stop(); void fast; }
 
 function startPlaying(name: MusicCtx): void {
-  const url = urls[name] || (probeFailed[name] ? '' : PATH[name]);
+  const url = urls[name] || (probeFailed[name] ? '' : PATH[name] || '');
   if (url) { startFile(name, url); return; }
   startSynth(name);
 }
@@ -141,7 +146,7 @@ function startSynth(name: MusicCtx): void {
     while (nextT < ctx.currentTime + 0.14) {
       const i = step % tr.len, odd = i & 1;
       if (i === 0 && step > 0 && boostBars > 0) boostBars--;
-      tr.step(buses, i, nextT + (odd ? tr.swing * s16 : 0), s16, name === 'pack' ? 1 : cur);
+      tr.step(buses, i, nextT + (odd ? tr.swing * s16 : 0), s16, name === 'pack' ? 1 : name === 'triumph' ? fanI : cur);
       nextT += s16; step++;
     }
   };

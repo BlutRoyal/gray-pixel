@@ -7,6 +7,7 @@ import { avatar, teamHue } from './avatar';
 import { cardArt, isTrapCard } from './cardart';
 import { RARITY_NAME, ccard, classLabel, whenLabel, type CCard } from '../casual/cards';
 import { cBaller } from '../casual/engine';
+import { specialText } from '../casual/specials';
 import { cardTier } from '../casual/packs';
 
 export const esc = (s: unknown): string => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -18,8 +19,13 @@ export const heroImgUrl = (id: number): string => `https://ballerz.com/images/al
 export const sneakerImgUrl = (id: number): string => `https://ballerz.cloud/images/sneakerz/${id}.png`;
 
 /** Real Baller image on the team-colour background. If it can't load, only the card number shows. */
+/** Image URLs that already loaded once this session: a re-render shows them at once instead of fading in from the placeholder again. */
+export const loadedImgs = new Set<string>();
+/** Image URLs that failed: a re-render goes straight to the fallback avatar instead of showing the placeholder again. */
+export const failedImgs = new Set<string>();
+export const ldCls = (url: string): string => (loadedImgs.has(url) ? ' ld' : '');
 export function ballerImg(c: BallerCard, cls = ''): string {
-  return `<span class="pwrap ${cls}" data-id="#${c.id}"><img class="pimg" src="${ballerImgUrl(c.id)}" data-fb="1" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`;
+  return `<span class="pwrap ${cls}" data-id="#${c.id}"><img class="pimg${ldCls(ballerImgUrl(c.id))}" src="${ballerImgUrl(c.id)}" data-fb="1" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`;
 }
 export function heroImg(cls: keyof typeof CLASSES, extra = ''): string {
   const d = CLASSES[cls];
@@ -42,10 +48,10 @@ export function coachPortrait(cls: keyof typeof CLASSES, on = false): string {
 /** Big coach portrait for the title screen: real image on an avatar-and-glow background; the pixel avatar shows when the image can't load. */
 export function coachArt(cls: keyof typeof CLASSES): string {
   const d = CLASSES[cls];
-  let bg = '';
-  try { const row = d.heroId ? ballerRow(d.heroId) : undefined; if (row) bg = `background-image:url(${avatar(ballerFromId(d.heroId!))})`; } catch { /* no avatar */ }
   const w = d.hero.split(/\s+/), initials = (w.length > 1 ? w.map((x) => x[0]).join('') : w[0]).slice(0, 2).toUpperCase();
-  return `<span class="coach-art" style="--acc:${CLASS_ACC[cls]};${bg}" aria-hidden="true">${bg ? '' : `<span class="ca-init">${esc(initials)}</span>`}${d.heroId ? `<img src="${heroImgUrl(d.heroId)}" data-fb="1" alt="" referrerpolicy="no-referrer">` : ''}</span>`;
+  const u = d.heroId ? heroImgUrl(d.heroId) : '';
+  if (d.heroId && failedImgs.has(u)) { let av = ''; try { av = `--av:url(${avatar(ballerFromId(d.heroId))});`; } catch { /* no canvas */ } if (av) return `<span class="coach-art avfb" style="--acc:${CLASS_ACC[cls]};${av}" aria-hidden="true"></span>`; }
+  return `<span class="coach-art" style="--acc:${CLASS_ACC[cls]}" aria-hidden="true"><span class="ca-init">${esc(initials)}</span>${d.heroId ? `<img class="${ldCls(u).trim()}" src="${u}" data-fb="1" data-av="${d.heroId}" alt="" referrerpolicy="no-referrer">` : ''}</span>`;
 }
 
 export const CLASS_SHORT: Record<string, string> = { splash: 'SPLASH', three: '3&D', show: 'SHOWTIME', pnr: 'P&R', bully: 'BULLY', bucket: 'BUCKETS', neutral: 'NEUTRAL' };
@@ -72,21 +78,24 @@ export interface CardOpts {
   /** Baller level 1..5: shown on the card and added to his stats. */
   level?: number;
 }
-const wrap = (kind: string, tier: Tier, o: CardOpts, inner: string, label: string): string =>
-  `<div class="card ${kind} t-${tier}${o.holo ? ' holo' : ''}${o.small ? ' sm' : ''}${tier === 'iconic' && !kind.startsWith('scard') ? ' ic-gl' : ''}" data-tilt role="img" aria-label="${esc(label)}">
-    <div class="cface">${inner}</div><div class="sheen"></div>${tier === 'iconic' && !kind.startsWith('scard') ? '<i class="stray ic-stray" aria-hidden="true"></i>' : ''}
+// An Iconic card keeps its top frame, but only the HOLO Iconic Baller glitches (continuously).
+const wrap = (kind: string, tier: Tier, o: CardOpts, inner: string, label: string): string => {
+  const gl = !!o.holo && tier === 'iconic' && kind.startsWith('bcard');
+  return `<div class="card ${kind} t-${tier}${o.holo ? ' holo' : ''}${o.small ? ' sm' : ''}${gl ? ' ic-gl' : ''}" data-tilt role="img" aria-label="${esc(label)}${o.holo ? ', HOLO' : ''}">
+    <div class="cface">${inner}</div><div class="sheen"></div>${tier === 'iconic' && !kind.startsWith('scard') ? '<i class="stray ic-stray" aria-hidden="true"></i>' : ''}${o.holo ? '<span class="holob">HOLO</span>' : ''}${gl ? '<i class="glbar" aria-hidden="true"></i>' : ''}
     ${o.count && o.count > 1 ? `<span class="cnt">×${o.count}</span>` : ''}${o.isNew ? '<span class="newb">NEW</span>' : ''}
   </div>`;
+};
 
 export function ballerCardHTML(id: number, o: CardOpts = {}): string {
-  const c = ballerFromId(id), tier = ballerTier(id), r = cBaller(id, null, o.level || 1), lv = o.level || 1;
+  const c = ballerFromId(id), tier = ballerTier(id), r = cBaller(id, null, o.level || 1, !!o.holo), lv = o.level || 1;
   return wrap('bcard', tier, o, `
     <div class="ctop"><span class="cls-tag">${CLASS_SHORT[c.cls]}</span><span class="tier-tag">${TIER_NAME[tier]}${lv > 1 ? ` · Lv ${lv}` : ''}</span></div>
     <div class="cart" style="--hue:${teamHue(c.team)}">${ballerImg(c)}</div>
     <div class="cname"><b>Baller ${esc(c.name)}</b><small>${esc(c.team)}</small></div>
     <div class="cstats">${statCells(c, false)}</div>
     <div class="ctrait cgame-line"><span>${r.pos}</span><span>RIM <b>${r.rim}</b></span><span>MID <b>${r.mid}</b></span><span>3PT <b>${r.three}</b></span><span>DEF <b>${r.def}</b></span></div>
-    <div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>`,
+    <div class="ctrait"><b>${esc(r.skill.name)}</b>: ${esc(r.skill.text)}</div>${r.special ? `<div class="ctrait csp"><b>Special: ${esc(r.special.name)}</b> ${esc(specialText(r.special, r.holo))}</div>` : ''}`,
   `Baller ${c.name}, ${TIER_NAME[tier]}`);
 }
 
@@ -122,7 +131,7 @@ export function sneakerSVG(rarI: number): string {
 /** Pointer tilt + moving sheen on any [data-tilt] card. */
 export function bindTilt(root: HTMLElement): void {
   if (reduced()) return;
-  root.addEventListener('pointermove', (e) => {
+  const tilt = (e: PointerEvent): void => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tilt]');
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -131,7 +140,17 @@ export function bindTilt(root: HTMLElement): void {
     el.style.setProperty('--ry', ((x - 0.5) * 16).toFixed(1) + 'deg');
     el.style.setProperty('--mx', (x * 100).toFixed(0) + '%');
     el.style.setProperty('--my', (y * 100).toFixed(0) + '%');
-  });
+  };
+  root.addEventListener('pointermove', tilt);
+  // a touch or click tilts the card toward the finger (it does not do anything else); touch lets go a moment later
+  root.addEventListener('pointerdown', tilt);
+  const settle = (e: Event): void => {
+    const pe = e as PointerEvent;
+    if (pe.pointerType === 'mouse') return;
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tilt]');
+    if (el) setTimeout(() => { el.style.removeProperty('--rx'); el.style.removeProperty('--ry'); }, 450);
+  };
+  root.addEventListener('pointerup', settle); root.addEventListener('pointercancel', settle);
   root.addEventListener('pointerout', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tilt]');
     if (el && !el.contains(e.relatedTarget as Node)) { el.style.removeProperty('--rx'); el.style.removeProperty('--ry'); }

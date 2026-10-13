@@ -340,6 +340,41 @@ const bounce: Recipe = (r, t, o) => {
   osc(r, 'triangle', 460, 210, t, 0.08, 0.8 * v, { sat: 2 }); osc(r, 'square', 300, 180, t, 0.05, 0.12 * v, { lp: 1600 }); nz(r, t, 0.06, (0.6 + p * 0.4) * v, { f0: 900, f1: 380, q: 0.8 }); click(r, t, 0.5 * p * v, 2500, 0.012); return 0.3;
 };
 
+// ---------- specials, fanfares ----------
+/** An Iconic special going off: a glitch tear, a rising zap, two bells. */
+const special: Recipe = (r, t, o) => {
+  const v = o.v ?? 1, holo = (o.rank ?? 0) >= 3;
+  const len = glitchSting(r, t, { ...o, rank: holo ? 3 : 2, v: 0.8 * v });
+  sweepSaw(r, t + 0.05, 0.45, 180, 1500, 300, 6500, 0.35 * v);
+  sub(r, t + 0.06, 140, 42, 0.5, 0.75 * v);
+  bell(r, t + 0.32, F.c5 * 2, 0.24 * v, 0.55); bell(r, t + 0.4, F.f5 * 2, 0.2 * v, 0.55);
+  if (holo) { bell(r, t + 0.48, F.c5 * 3, 0.2 * v, 0.7); nz(r, t + 0.3, 0.5, 0.3 * v, { ft: 'highpass', f0: 6500, a: 0.01, rev: 0.3 }); }
+  return Math.max(len, holo ? 1.4 : 1.1);
+};
+/** Heavy brass-and-sub fanfare stinger. rank 0 = Iconic pull / win, 1 = HOLO (adds a glitch tear and bells), level scales a win. */
+const triumphHit: Recipe = (r, t, o) => {
+  const v = o.v ?? 1, holo = (o.rank ?? 0) >= 1, big = 0.8 + (o.level ?? 0.5) * 0.4, R = rng(55);
+  if (holo) for (let k = 0; k < 10; k++) { const at = t + k * 0.028 + R() * 0.01; osc(r, 'square', 200 + R() * 3000, 120 + R() * 600, at, 0.03, 0.2 * v, { crush: 3, a: 0.001 }); }
+  const b = t + (holo ? 0.3 : 0);
+  sub(r, b, 130, 30, 1.2, 1.0 * v * big, { gate: 0.3 }); osc(r, 'sine', 280, 52, b, 0.22, 0.8 * v, { sat: 4 }); click(r, b, 0.9 * v, 3000, 0.02);
+  nz(r, b, 0.4, 0.9 * v, { ft: 'lowpass', f0: 7000, f1: 300, a: 0.001, gate: 0.5, rev: 0.3 });
+  uni(r, 'sawtooth', [F.f3, F.c4, F.f4], b, 0.5, 0.55 * v, { lp: 3600, crush: 6, rev: 0.3, hold: 0.05 });
+  uni(r, 'sawtooth', [F.ab3, F.eb4, F.ab4], b + 0.26, 0.5, 0.55 * v, { lp: 3800, rev: 0.3, hold: 0.05 });
+  uni(r, 'sawtooth', [F.c4, F.eb4 * 2 / 2, F.c5, F.f5 / 2], b + 0.52, 1.1, 0.6 * v, { lp: 4200, rev: 0.35, hold: 0.2 });
+  nz(r, b + 0.5, 1.0, 0.35 * v, { ft: 'highpass', f0: 6500, a: 0.01, rev: 0.3 });
+  [1, 1.5, 2, 3].forEach((q, k) => bell(r, b + 0.55 + k * 0.08, F.c5 * q, 0.24 * v, 0.7 + (holo ? 0.3 : 0)));
+  return 2.2 + (holo ? 0.3 : 0);
+};
+/** A lighter loss sound: two low falling notes and a soft thud. */
+const defeat: Recipe = (r, t, o) => {
+  const v = o.v ?? 1;
+  sub(r, t, 90, 40, 0.45, 0.7 * v); click(r, t, 0.4 * v, 2200, 0.012);
+  uni(r, 'sawtooth', [F.c3, F.eb3], t + 0.02, 0.5, 0.3 * v, { lp: 1400, rev: 0.3 });
+  uni(r, 'sawtooth', [F.ab2, F.c3], t + 0.4, 0.8, 0.3 * v, { lp: 1100, rev: 0.4, glide: 0.94 });
+  sub(r, t + 0.4, 70, 34, 0.7, 0.6 * v);
+  return 1.4;
+};
+
 export interface SoundDef { fn: Recipe; /** 0 may be dropped when busy, 2 always plays */ pri: 0 | 1 | 2; /** rough voice cost */ cost: number; cat: 'ui' | 'play' | 'big'; trim: number }
 const d = (fn: Recipe, pri: 0 | 1 | 2, cost: number, cat: SoundDef['cat']): SoundDef => ({ fn, pri, cost, cat, trim: 1 });
 export const SOUNDS = {
@@ -351,6 +386,8 @@ export const SOUNDS = {
   glitch1: d((r, t, o) => glitchSting(r, t, { ...o, rank: 1 }), 2, 22, 'big'), glitch2: d((r, t, o) => glitchSting(r, t, { ...o, rank: 2 }), 2, 36, 'big'), glitch3: d((r, t, o) => glitchSting(r, t, { ...o, rank: 3 }), 2, 56, 'big'),
   subSwap: d(subSwap, 1, 8, 'play'), coin: d(coin, 1, 8, 'ui'), shard: d(shard, 1, 12, 'ui'), levelUp: d(levelUp, 2, 24, 'big'), reward: d(reward, 2, 26, 'big'),
   packRip: d(packRip, 2, 36, 'big'), packCharge: d(packCharge, 2, 16, 'play'), packReveal: d(packReveal, 2, 22, 'big'), iconicHit: d(iconicHit, 2, 52, 'big'),
+  special: d((r, t, o) => special(r, t, { ...o, rank: 2 }), 2, 44, 'big'), specialHolo: d((r, t, o) => special(r, t, { ...o, rank: 3 }), 2, 62, 'big'),
+  triumphHit: d(triumphHit, 2, 56, 'big'), victory: d((r, t, o) => triumphHit(r, t, { ...o, rank: 0, level: o.level ?? 0.5 }), 2, 56, 'big'), defeat: d(defeat, 1, 16, 'play'),
   nextTick: d(nextTick, 0, 3, 'ui'), summary: d(summary, 2, 30, 'big'), boot: d(boot, 2, 40, 'big'), bounce: d(bounce, 1, 6, 'play'),
 } satisfies Record<string, SoundDef>;
 export type SfxName = keyof typeof SOUNDS;

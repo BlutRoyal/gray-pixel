@@ -1,16 +1,18 @@
-// Baller card for the game: portrait (real image, pixel avatar underneath), the pieces of a Baller a coach needs to decide
+// Baller card for the game: portrait (real image; pixel avatar only as an error fallback), the pieces of a Baller a coach needs to decide
 // (#, position, Rim / Mid / Three, DEF, skill, fatigue, level, Sneaker), the sub comparison arrows, and the tiny token badges.
 import { TIER_NAME, type Tier } from '../rules';
 import { FATIGUE, fatigueOf, type CBaller, type Zone } from '../casual/engine';
 import { POS_NAME, ZONE_NAME, shoeText } from '../casual/skills';
+import { SP_HOLO_TEXT, specialText } from '../casual/specials';
 import { avatar, teamHue } from './avatar';
-import { ballerFromId, ballerImgUrl, esc } from './views';
+import { ballerFromId, ballerImgUrl, esc, failedImgs, ldCls } from './views';
 
-/** Round portrait: a pixel avatar drawn from his traits sits under the real image, so a blocked image still shows a face. */
+/** Round portrait. Load state: a neutral team-colour placeholder, then the real image fades in, and the pixel avatar is drawn
+ *  only if the image fails (see the error listener in main.ts). It is never an underlay behind a loaded image. */
 export function portrait(b: { id: number; team: string }, cls = ''): string {
-  let bg = '';
-  try { bg = `--av:url(${avatar(ballerFromId(b.id))});`; } catch { /* no canvas */ }
-  return `<span class="pt ${cls}" style="--hue:${teamHue(b.team)};${bg}"><img src="${ballerImgUrl(b.id)}" data-fb="1" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`;
+  const u = ballerImgUrl(b.id);
+  if (failedImgs.has(u)) { try { return `<span class="pt avfb ${cls}" style="--hue:${teamHue(b.team)};--av:url(${avatar(ballerFromId(b.id))})"></span>`; } catch { /* fall through to the placeholder */ } }
+  return `<span class="pt ${cls}" style="--hue:${teamHue(b.team)}"><img class="${ldCls(u).trim()}" src="${u}" data-fb="1" data-av="${b.id}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`;
 }
 export const posBadge = (b: CBaller): string => `<i class="pos pos-${b.pos}" title="${POS_NAME[b.pos]}">${b.pos}</i>`;
 /** "R85 M71 3P73" mini row used on chips and tiles. `zone` highlights one value. */
@@ -51,6 +53,18 @@ export interface CardCtx {
   isShooter?: boolean;
   /** Bench Baller: show how he compares with this court Baller. */
   versus?: CBaller;
+  /** Iconic special: ready / used / wait (usable later, `why` says what is missing); idx = court slot, mine = the player's own court Baller. */
+  special?: { state: 'ready' | 'used' | 'wait'; why: string; idx: number; mine: boolean; when: string };
+}
+/** The special block of a Baller card: name, state, one-line effect, flavour, and the button when it is yours. */
+export function specialBlockHTML(b: CBaller, c: NonNullable<CardCtx['special']>): string {
+  const sp = b.special!;
+  const st = c.state === 'used' ? 'USED' : 'READY';
+  const btn = c.mine ? `<button class="btn go sp-use" data-a="special" data-v="${c.idx}" ${c.state === 'used' ? 'disabled' : ''}>${c.state === 'used' ? 'Used this game' : 'Use special'}</button>` : '';
+  return `<div class="bc-sp ${c.state}${b.holo ? ' holo' : ''}"><div class="bc-sp-h"><span class="sp-ic" aria-hidden="true">⚡</span><b>${esc(sp.name)}</b>${b.holo ? '<i class="holob sm">HOLO</i>' : ''}<em>${st}</em></div>
+    <p class="bc-sp-t">${esc(specialText(sp, b.holo))}</p>
+    <small class="dim">${esc(sp.flavor)} · ${esc(c.when)}. Once per game, no Momentum.${b.holo ? ' ' + esc(SP_HOLO_TEXT()) : ''}</small>
+    ${c.state === 'wait' && c.why ? `<small class="bc-sp-why">Not now: ${esc(c.why)}</small>` : ''}${btn}</div>`;
 }
 const statCell = (l: string, v: number, hi = false): string => `<div class="bs${hi ? ' hi' : ''}"><span>${l}</span><b>${v}</b></div>`;
 /** The full Baller card as a modal. `data-a="noop"` keeps clicks on the card from closing it. */
@@ -67,11 +81,12 @@ export function ballerCardHTML(b: CBaller, c: CardCtx): string {
   return `<div class="overlay sheetwrap" id="ballerCard" data-a="bcclose"><div class="bc t-${tier} ${c.mine ? 'mine' : 'theirs'}" data-a="noop" role="dialog" aria-modal="true" aria-label="Baller ${esc(b.name)}">
     <button class="bc-x" data-a="bcclose" aria-label="Close">✕</button>
     <div class="bc-head">${portrait(b, 'xl')}<div class="bc-id"><b class="bc-num">${esc(b.name)}</b>
-      <span class="bc-sub">${posBadge(b)} ${POS_NAME[b.pos]} · ${TIER_NAME[tier] || tier}${b.level > 1 ? ` · Lv ${b.level}` : ' · Lv 1'}</span>
+      <span class="bc-sub">${posBadge(b)} ${POS_NAME[b.pos]} · ${TIER_NAME[tier] || tier}${b.holo ? ' · <i class="holob sm">HOLO</i>' : ''}${b.level > 1 ? ` · Lv ${b.level}` : ' · Lv 1'}</span>
       <small class="dim">${esc(b.team)}${look ? ' · ' + esc(look) : ''}${c.mine ? '' : ' · opponent'}</small></div></div>
     <div class="bc-stats">${statCell('RIM', b.rim)}${statCell('MID', b.mid)}${statCell('THREE', b.three)}${statCell('DEF', b.def)}${statCell('PLY', b.ply)}</div>
     ${ch}
     <div class="bc-skill"><b>${esc(b.skill.name)}</b><span>${esc(b.skill.text)}</span></div>
+    ${b.special && c.special ? specialBlockHTML(b, c.special) : ''}
     <div class="bc-rows">
       <div><em>Fatigue</em>${fatigueBar(b)}</div>
       <div><em>Level</em><span class="pips" aria-hidden="true">${Array.from({ length: 5 }, (_x, i) => `<i class="${i < b.level ? 'on' : ''}"></i>`).join('')}</span><small class="dim">Lv ${b.level} of 5${b.level > 1 ? ` · +${b.level - 1} to every stat` : ''}</small></div>

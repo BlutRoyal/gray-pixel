@@ -14,6 +14,7 @@ export const DEFAULTS = {
   a1Base: 8, a1Dnk: 10, a1Def: 6, a1Beat: 10, a1Cap: 35,
   powRare: 1.5, powEpic: 1.5, powLegendary: 1.5, powIconic: 1.5, lvStep: 2, lvStepBasic: 1,
   snkCommon: 1, snkUncommon: 2, snkRare: 4, snkLegendary: 6, snkIconic: 8, snkBullseye: 8, snkCustom: 3, snkPlain: 2,
+  spOn: 1, spScale: 1, spOff: 1, spDef: 1, spUtil: 1, spHolo: 1.3, spHoloMo: 1,
 };
 export type TuneKey = keyof typeof DEFAULTS;
 export const TUNING: Record<TuneKey, number> = { ...DEFAULTS };
@@ -74,6 +75,13 @@ export const TUNE_DEFS: TuneDef[] = [
   { key: 'snkBullseye', label: 'Custom Bullseye %', group: 'Sneakerz', min: 0, max: 12, step: 1 },
   { key: 'snkCustom', label: 'Custom with enhancement %', group: 'Sneakerz', min: 0, max: 12, step: 1 },
   { key: 'snkPlain', label: 'Custom without enhancement %', group: 'Sneakerz', min: 0, max: 12, step: 1 },
+  { key: 'spOn', label: 'Iconic specials on (1) / off (0)', group: 'Specials', min: 0, max: 1, step: 1, hint: 'Off = the specials are disabled for both sides' },
+  { key: 'spScale', label: 'Special strength x (all)', group: 'Specials', min: 0.3, max: 2, step: 0.05, hint: 'Scales every special number (percent and counts)' },
+  { key: 'spOff', label: 'Special strength x, offense specials', group: 'Specials', min: 0.3, max: 2, step: 0.05 },
+  { key: 'spDef', label: 'Special strength x, defense specials', group: 'Specials', min: 0.3, max: 2, step: 0.05 },
+  { key: 'spUtil', label: 'Special strength x, utility specials', group: 'Specials', min: 0.3, max: 2, step: 0.05 },
+  { key: 'spHolo', label: 'HOLO special strength x', group: 'Specials', min: 1, max: 2, step: 0.05, hint: '1.3 = HOLO is 30% stronger' },
+  { key: 'spHoloMo', label: 'HOLO special extra Momentum', group: 'Specials', min: 0, max: 4, step: 1 },
 ];
 const KEY = 'bdl-tuning';
 export function setTune(k: TuneKey, v: number): void { if (k in DEFAULTS && Number.isFinite(v)) { TUNING[k] = v; persist(); } }

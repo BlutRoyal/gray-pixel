@@ -14,6 +14,7 @@ import { liteLabel, liteOn, liteWhy } from './lite';
 import { MENU_LINES } from './lore';
 import { freePack } from './packs';
 import { previewPlay } from './play';
+import { checkLabPass, gateHTML, labOpen, unlockLab } from './gate';
 
 interface Report { games: number; poss: number; clutch: number; make: number; shots: number; out: number; zs: Record<string, number>; subs: number; dts: number; traps: number; cls: Record<string, { w: number; g: number }>; stages: { name: string; starter: number; strong: number }[] }
 let res: Report | null = null;
@@ -27,6 +28,16 @@ let tuneMsg = '';
 let jsonText = '';
 export function initLab(changed: () => void): void {
   onChange = changed;
+  document.addEventListener('submit', (e) => {
+    const f = e.target as HTMLElement;
+    if (f.id !== 'labGate') return;
+    e.preventDefault();
+    const inp = document.getElementById('labPw') as HTMLInputElement | null;
+    void checkLabPass(inp ? inp.value : '').then((ok) => {
+      if (ok) { unlockLab(); gateErr = ''; onChange(); }
+      else { gateErr = 'Wrong password.'; const el = document.getElementById('labErr'); if (el) el.textContent = gateErr; if (inp) { inp.value = ''; inp.focus(); inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); } sfx('back'); }
+    });
+  });
   document.addEventListener('change', (e) => {
     const el = e.target as HTMLInputElement;
     if (el.dataset?.tune) { setTune(el.dataset.tune as TuneKey, +el.value); tuneMsg = ''; }
@@ -83,7 +94,9 @@ function report(r: Report): string {
   <section class="panel"><h2 class="h">Story difficulty</h2><p class="dim small">Win rate of a decent player with the three starters and starter deck, and with a strong squad and good cards.</p>
     <table><thead><tr><th class="left">Court</th><th>Starters</th><th>Strong squad</th></tr></thead><tbody>${r.stages.map((s) => `<tr><td class="left">${esc(s.name)}</td><td>${s.starter}%</td><td>${s.strong}%</td></tr>`).join('')}</tbody></table></section>`;
 }
+let gateErr = '';
 export function labHTML(): string {
+  if (!labOpen()) return gateHTML(gateErr);
   const P = profile();
   return `<section class="panel"><h2 class="h">AI vs AI simulation</h2>
     <p class="dim small">Every coach plays every other coach, then a typical player runs the story ladder. The same check runs from the command line: <code>npx tsx tools/csim.ts 60</code>.</p>

@@ -5,12 +5,13 @@ import { CLASSES, CLS_KEYS, TIER_NAME, ballerRow, ri, seedRng, sneakerRow, type 
 import {
   CLUTCH, CLUTCH_NAME, COACH_PERK, TUNING, FATIGUE, SCHEME_NAME, SQUAD_SIZE, ZONES, ZONE_NAME, ZONE_PTS, aiDefense, aiOffense, aiSubs,
   canClutch, canShoot, shooterSlots, chance, chanceNow, clutchBonusAt, clutchTap, costOf, cycleMatch, doSub, equip, fatigueOf, newGame, newSide, nextPossession, options, playBlock,
-  playCard, resolve, setDT, starterIds, subBlock,
+  playCard, resolve, setDT, starterIds, subBlock, aiRewind, specialBlock, useSpecial,
   type CBaller, type CGame, type Outcome, type Side, type Zone,
 } from '../casual/engine';
 import { POS_NAME, shoeOf, shoeText } from '../casual/skills';
+import { SP_KINDS, SP_WHEN_TEXT, specialText } from '../casual/specials';
 import { STAGES, QUICK, cpuSide, type Stage } from '../casual/story';
-import { addCard, countGame, profile, save, setFast } from './store';
+import { addCard, countGame, holoMap, profile, save, setFast } from './store';
 import { MILESTONES, QUICK_LOSS, QUICK_WIN, STAR_TEXT, applyGame, claimMilestone, claimable, dayKey, milestoneText, starsFor, totalStars } from '../casual/progress';
 import { cardLevels, deckIsAuto, myDeck } from './deck';
 import { CLASS_ACC, ballerImgUrl, ccardFace, coachArt, esc, heroImg, reduced } from './views';
@@ -21,14 +22,15 @@ import { GAME_TAGLINE, GLITCH_LORE, MENU_LINES, TITLE_LINES, pick } from './lore
 import { wordmarkSVG } from './wordmark';
 import { getAudio, sfx } from './sfx';
 import { speakerIcon } from './sound';
-import { setTension, spikeTension } from './music';
+import { setMusicOverride, setTension, spikeTension } from './music';
 import { teamHue } from './avatar';
-import { ballArc, ballHop, banner, blockFx, burst, callout, centerOf, flash, freeThrow, fxPlaying, getSpeed, glitchEl, glitchSlam, handFx, play, pulse, setSpeed, skipped, swish, tip, whistleFx, type Step, type Tone, type XY } from './fx';
-import { openPending } from './packs';
+import { boxHTML, boxShortHTML } from './boxview';
+import { ballArc, ballHop, banner, blockFx, burst, callout, centerOf, flash, freeThrow, fxPlaying, getSpeed, glitchEl, glitchSlam, handFx, play, pulse, setSpeed, skipped, swish, tip, whistleFx, winFx, type Step, type Tone, type XY } from './fx';
+import { dailyHTML, openPending } from './packs';
 import { liteOn } from './lite';
 import { RARITY_NAME, allCards, ccard, classLabel, effectTag, levelStep, whenLabel, type CCard } from '../casual/cards';
 import { cardTier } from '../casual/packs';
-import { ballerCardHTML, compareArrows, fatigueBar, miniStats, portrait, posBadge } from './bcard';
+import { ballerCardHTML, compareArrows, type CardCtx, fatigueBar, miniStats, portrait, posBadge } from './bcard';
 import { SCENES, EMPTY_CTX, type Ctx, type Snap } from './tutorialSteps';
 import { setTutHost, tutActive, tutBegin, tutEnd, tutMark, tutNote, tutSync } from './tutorial';
 
@@ -94,7 +96,8 @@ function autoShoes(): void {
   save();
 }
 const cardLevelLine = (c: CCard): string => { const lv = c.lv || 1; return `<p class="cp-lv">Card level ${lv} of 5${lv > 1 ? ` · effect +${Math.round((lv - 1) * levelStep(c.rarity) * 10) / 10}%` : ''}</p>`; };
-const mySquad = (): CBaller[] => equip(profile().squad, Object.fromEntries(Object.entries(profile().shoes || {}).map(([k, v]) => [+k, v])), profile().levels);
+const mySquad = (): CBaller[] => equip(profile().squad, Object.fromEntries(Object.entries(profile().shoes || {}).map(([k, v]) => [+k, v])), profile().levels, holoMap());
+const holoTag = (b: CBaller, sm = true): string => (b.holo ? `<i class="holob${sm ? ' sm' : ''}" title="HOLO Iconic: stronger special">HOLO</i>` : '');
 
 // ---------- shared bits ----------
 /** A segmented power bar. `p` is the chance; `read` (optional) marks how far it drops if the defense guesses right. */
@@ -112,7 +115,7 @@ function token(b: CBaller, side: Side, i: number, opt: { off: boolean; sel?: boo
   const stam = `<span class="tok-fat${tired ? ' tired' : ''}" style="--f:${Math.min(100, Math.round((b.run / span) * 100))}%" title="Stamina: ${b.run} attacks on court. Tired after ${FATIGUE.start - 1}."></span>`;
   return `<button class="tok ${side === 0 ? 'me' : 'cpu'}${opt.sel ? ' sel' : ''}${opt.fire ? ' fire' : ''}${opt.flag ? ' flagged' : ''}${opt.cool ? ' cooling' : ''}" data-tok="${side}-${i}" data-a="baller" data-v="${side}:${i}:c" aria-label="${esc(b.name)}, ${POS_NAME[b.pos]}. Tap for his card." title="${esc(b.name)}: ${esc(b.skill.name)}. ${esc(b.skill.text)}">
     ${portrait(b, 'tok-img')}<i class="tok-num">${esc(b.name)}</i>
-    ${ring}${opt.sel ? '<span class="tok-ball" aria-hidden="true"></span>' : ''}${opt.fire ? '<span class="tok-flame" aria-hidden="true">' + icon('fire') + '</span>' : ''}${opt.flag ? `<span class="tok-flag">${opt.flag}</span>` : opt.shadow ? '<span class="tok-flag">SHADOWED</span>' : ''}
+    ${b.special ? `<i class="tok-sp ${b.spUsed ? 'used' : 'ready'}${b.holo ? ' holo' : ''}" title="${esc(b.special.name)}: ${b.spUsed ? 'used' : 'ready'}">${icon('clutch')}</i>` : ''}${ring}${opt.sel ? '<span class="tok-ball" aria-hidden="true"></span>' : ''}${opt.fire ? '<span class="tok-flame" aria-hidden="true">' + icon('fire') + '</span>' : ''}${opt.flag ? `<span class="tok-flag">${opt.flag}</span>` : opt.shadow ? '<span class="tok-flag">SHADOWED</span>' : ''}
     <span class="tok-tag">${tag}</span>${stam}</button>`;
 }
 
@@ -121,7 +124,7 @@ function token(b: CBaller, side: Side, i: number, opt: { off: boolean; sel?: boo
 function slotTile(b: CBaller | undefined, slot: number, on: boolean): string {
   if (!b) return `<button class="sl empty${on ? ' on' : ''}" data-a="slot" data-v="${slot}"><span class="sl-plus">+</span><b>Empty</b><small>Tap to pick</small></button>`;
   return `<button class="sl${on ? ' on' : ''}" data-a="slot" data-v="${slot}" aria-label="${slot < 3 ? 'On court' : 'Bench'} slot ${slot + 1}: ${esc(b.name)}">
-    ${portrait(b, 'sl-pt')}<span class="sl-t"><b>${esc(b.name)} ${posBadge(b)}</b>${miniStats(b)}<small class="sl-shoe${b.shoe ? '' : ' dim'}">${b.shoe ? `Sneaker +${b.shoe.bonus}%${b.shoe.jumpRim ? ` · Jump +${Math.round(b.shoe.jumpRim)}` : ''}` : 'No Sneaker'}</small></span>${b.level > 1 ? `<i class="lvtag">Lv ${b.level}</i>` : ''}</button>`;
+    ${portrait(b, 'sl-pt')}<span class="sl-t"><b>${esc(b.name)} ${posBadge(b)}${holoTag(b)}</b>${miniStats(b)}${b.special ? `<small class="sl-sp">${icon('clutch')} ${esc(b.special.name)}</small>` : ''}<small class="sl-shoe${b.shoe ? '' : ' dim'}">${b.shoe ? `Sneaker +${b.shoe.bonus}%${b.shoe.jumpRim ? ` · Jump +${Math.round(b.shoe.jumpRim)}` : ''}` : 'No Sneaker'}</small></span>${b.level > 1 ? `<i class="lvtag">Lv ${b.level}</i>` : ''}</button>`;
 }
 function squadHTML(): string {
   const team = mySquad();
@@ -159,11 +162,11 @@ function slotSheet(slot: number): string {
   const P = profile(), cur = mySquad()[slot], tab = cur ? UI.sqTab : 'b', lim = 40 + UI.sqMore;
   let list = '', more = 0;
   if (tab === 'b') {
-    const all = ownedBallerz().map((id) => equip([id], [], profile().levels)[0]).sort((a, b) => (b.id === cur?.id ? 1 : 0) - (a.id === cur?.id ? 1 : 0) || bestOf(b) - bestOf(a));
+    const all = ownedBallerz().map((id) => equip([id], [], profile().levels, holoMap())[0]).sort((a, b) => (b.id === cur?.id ? 1 : 0) - (a.id === cur?.id ? 1 : 0) || bestOf(b) - bestOf(a));
     more = Math.max(0, all.length - lim);
     list = all.slice(0, lim).map((b) => {
       const at = P.squad.indexOf(b.id);
-      return `<button class="sqp-row${b.id === cur?.id ? ' on' : ''}" data-a="slotset" data-v="${b.id}">${portrait(b, 'sm')}<span class="sqp-name"><b>${esc(b.name)} ${posBadge(b)}${b.level > 1 ? ` <i class="lvtag">Lv ${b.level}</i>` : ''}</b><small>${esc(b.skill.name)} · DEF ${b.def}</small>${miniStats(b)}</span><span class="sqp-at">${b.id === cur?.id ? 'HERE' : at >= 0 ? (at < 3 ? 'ON COURT' : 'BENCH') + ' · swap' : ''}</span></button>`;
+      return `<button class="sqp-row${b.id === cur?.id ? ' on' : ''}" data-a="slotset" data-v="${b.id}">${portrait(b, 'sm')}<span class="sqp-name"><b>${esc(b.name)} ${posBadge(b)}${holoTag(b)}${b.level > 1 ? ` <i class="lvtag">Lv ${b.level}</i>` : ''}</b><small>${esc(b.skill.name)}${b.special ? ' · ' + esc(b.special.name) : ''} · DEF ${b.def}</small>${miniStats(b)}</span><span class="sqp-at">${b.id === cur?.id ? 'HERE' : at >= 0 ? (at < 3 ? 'ON COURT' : 'BENCH') + ' · swap' : ''}</span></button>`;
     }).join('') || '<p class="dim small">You own no Ballerz yet.</p>';
   } else {
     const all = ownedSneakerz().map((id) => ({ id, s: shoeOf(sneakerRow(id))! })).sort((a, b) => (b.s.bonus + b.s.jumpRim * 0.5 + (b.s.enh ? 1 : 0)) - (a.s.bonus + a.s.jumpRim * 0.5 + (a.s.enh ? 1 : 0)));
@@ -201,15 +204,25 @@ let titleSeed = Date.now();
 /** The title screen: logo, the six Coaches as the hero of the screen, and the main menu. */
 /** A note before a game starts when no valid hand-built deck exists. */
 const autoDeckNote = (): string => (deckIsAuto(profile().coach as ClassKey) ? `<p class="dk-note pre" id="autoDeckNote"><b>Using an auto deck</b> - build one in <button class="lnk" data-a="tab" data-v="deck">Deck</button>.</p>` : '');
+/** Title backdrop: a neon wireframe basketball over a perspective court with a rim and backboard, plus one glitch scan. Static SVG, no per-element work. */
+function courtBackdrop(): string {
+  const lines = Array.from({ length: 9 }, (_x, i) => { const x = -400 + i * 150; return `<path d="M${x} 400 L${300 + (x - 300) * 0.18} 250"/>`; }).join('');
+  const rows = [262, 276, 296, 324, 362].map((y) => `<path d="M${300 - (y - 250) * 4.2} ${y} H${300 + (y - 250) * 4.2}"/>`).join('');
+  return `<div class="tt-bd" aria-hidden="true"><svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMin meet" focusable="false">
+    <g class="bd-court">${lines}${rows}<ellipse cx="300" cy="330" rx="150" ry="34"/><path d="M215 396 V300 H385 V396"/></g>
+    <g class="bd-ball"><circle cx="300" cy="150" r="104"/><ellipse cx="300" cy="150" rx="44" ry="104"/><path d="M196 150 H404"/><path d="M226 80 Q300 150 226 220"/><path d="M374 80 Q300 150 374 220"/></g>
+    <g class="bd-hoop"><rect x="418" y="46" width="96" height="62" rx="3"/><rect x="448" y="76" width="36" height="26"/><path d="M440 108 H492"/><ellipse cx="466" cy="112" rx="26" ry="6"/><path class="bd-net" d="M440 112 L449 146 M452 114 L456 148 M466 118 V150 M480 114 L476 148 M492 112 L483 146 M444 130 H488"/></g>
+    <rect class="bd-scan" x="0" y="0" width="600" height="3"/></svg></div>`;
+}
 function titleHTML(): string {
   ensureSquad();
   const P = profile(), cur = (CLS_KEYS.includes(P.coach as ClassKey) ? P.coach : 'splash') as ClassKey, d = CLASSES[cur];
   const team = mySquad();
   const next = Math.min(P.story, STAGES.length - 1);
   const menu: [string, string, string][] = [['Play', 'quick', 'Quick match'], ['Story', 'tab:story', 'Eight courts'], ['Packs', 'tab:packs', 'Render cards'], ['Collection', 'tab:collection', 'Your cards'], ['Deck', 'tab:deck', 'Build a deck'], ['How', 'tab:how', 'Rules'], ['Lab', 'tab:lab', 'Dev tools']];
-  const skyline = Array.from({ length: 26 }, (_x, i) => { const h = 18 + ((i * 37) % 41), w = 14 + ((i * 17) % 20); return `<i style="--h:${h}%;--w:${w}px;--d:${(i * 0.37).toFixed(2)}s"></i>`; }).join('');
+  const backdrop = courtBackdrop();
   return `<section class="title" style="--acc:${CLASS_ACC[cur]}">
-    <div class="tt-sky" aria-hidden="true">${skyline}</div>
+    ${backdrop}
     <header class="tt-head">
       <h1 class="tt-wm"><span class="sr-only">Gray Pixel</span>${wordmarkSVG('wm-title')}</h1>
       <p class="tt-tag">${esc(GAME_TAGLINE)}</p>
@@ -229,6 +242,7 @@ function titleHTML(): string {
     <div class="coach-strip" role="radiogroup" aria-label="Choose your coach">${CLS_KEYS.map((k) => `<button class="cs-pick${k === cur ? ' on' : ''}" style="--acc:${CLASS_ACC[k]}" role="radio" aria-checked="${k === cur}" data-a="coach" data-v="${k}">${coachArt(k)}<b>${esc(CLASSES[k].hero)}</b><small>${esc(CLASSES[k].name)}</small></button>`).join('')}</div>
     <div class="tt-squad"><span class="dim small">${esc(MENU_LINES.squad)}</span><span class="tt-faces">${team.map((b) => portrait(b, 'tok-img sm')).join('')}</span><button class="btn sm" data-a="squad">Edit squad</button></div>
     <nav class="tt-menu" aria-label="Menu">${menu.map(([t, a, sub]) => `<button class="tt-btn${a === 'quick' ? ' main' : ''}" ${a.startsWith('tab:') ? `data-a="tab" data-v="${a.slice(4)}"` : `data-a="${a}"`}><b>${t}</b><small>${sub}</small></button>`).join('')}</nav>
+    ${dailyHTML(true)}
     <p class="tt-tut"><button class="btn sm ghost" data-a="tutorial">${P.tut.state === 'new' || P.tut.state === 'skipped' ? 'New here? Play the guided game' : 'Replay tutorial'}</button></p>
   </section>`;
 }
@@ -330,6 +344,7 @@ function offPanel(): string {
     <div class="picker" role="group" aria-label="Shooter">${chips}</div>
     <div class="shot-trio">${ZONES.map(zoneBtn).join('')}</div>
     <div class="pg-info dim small">${scouted}${P.zone ? `${esc(shooter.name)}: ` : ''}${passer ? `pass from ${esc(passer.name)} (PLY ${passer.ply}). ` : P.offCard?.fx.iso || P.offCard?.fx.fixed ? 'no pass on this one. ' : ''}<span title="${esc(shooter.skill.text)}">${esc(shooter.skill.name)}.</span>${fatigueOf(shooter) ? ` Tired −${fatigueOf(shooter)}%.` : ''}</div>
+    ${spRow()}
     <div class="pg-foot">${P.offCard ? `<span class="played">${cardChip(P.offCard)}</span>` : '<span class="dim small played">Card: tap one below (optional)</span>'}
       <button class="btn sm" data-a="subs">Subs</button>
       ${canClutch(g, 0) ? `<button class="btn hero${P.clutch ? ' on' : ''}" data-a="clutch">${P.clutch ? 'CLUTCH ON' : 'Clutch'}</button>` : ''}
@@ -350,9 +365,33 @@ function defPanel(): string {
     ${UI.msg ? `<div class="msg">${esc(UI.msg)}</div>` : ''}
     <div class="shot-trio">${ZONES.map(scheme).join('')}</div>
     <div class="matches"><div class="mx-cap dim small">Man-to-man: top = their Baller (2× double team), below = who guards him. Tap a defender to swap.${P.dt ? ` ${esc(C.team[P.dt.open]?.name || '')} is left open.` : ''}</div><div class="mx-row">${mx}</div></div>
+    ${spRow()}
     <div class="pg-foot">${P.defCard ? `<span class="played">${cardChip(P.defCard)}</span>` : `<span class="dim small played">${esc(CLASSES[C.coach].hero)} likes ${ZONE_NAME[options(g, 1)[0].zone]}. Card optional.</span>`}
       <button class="btn sm" data-a="subs">Subs</button>
       <button class="btn go" data-a="lock" ${P.guard ? '' : 'disabled'}>Lock in</button></div></div>`;
+}
+/** The Iconic specials of the Ballerz on court: READY / USED buttons (in the result phase only Rewind-type ones are shown). */
+function spRow(): string {
+  const g = G!, S = g.sides[0];
+  const items = S.team.map((b, i) => ({ b, i })).filter(({ b }) => b.special && (UI.phase !== 'result' || SP_KINDS[b.special.type].when === 'after'));
+  if (!items.length) return '';
+  return `<div class="sp-row" role="group" aria-label="Iconic specials">${items.map(({ b, i }) => {
+    const sp = b.special!, why = b.spUsed ? '' : specialBlock(g, 0, i), st = b.spUsed ? 'used' : why ? 'wait' : 'ready';
+    return `<button class="spbtn ${st}${b.holo ? ' holo' : ''}" data-a="special" data-v="${i}" ${st === 'used' ? 'disabled' : ''} title="${esc(sp.name + ': ' + specialText(sp, b.holo) + (why ? ' (' + why + ')' : ''))}" aria-label="${esc(sp.name)}, ${st === 'used' ? 'used' : 'ready'}${why ? '. ' + esc(why) : ''}">
+      <span class="sp-ic">${icon('clutch')}</span><span class="sp-t"><b>${esc(sp.name)}</b><small>${esc(b.name)}${st === 'wait' ? ' · ' + esc(why!) : ''}</small></span><em>${st === 'used' ? 'USED' : 'READY'}</em></button>`;
+  }).join('')}</div>`;
+}
+/** Shows (and sounds) every special used since the last call: a glitch hit on the Baller and a title. */
+function flushSpEvents(): void {
+  const g = G;
+  if (!g) return;
+  const evs = g.spq.splice(0);
+  for (const e of evs) {
+    sfx(e.holo ? 'specialHolo' : 'special');
+    if (reduced()) continue;
+    glitchEl(tokEl(e.side, e.idx), 700);
+    glitchSlam(e.holo ? 2 : 1, esc(e.name.toUpperCase()), esc(`${e.side === 0 ? 'You' : 'CPU'} · ${e.flavor}`));
+  }
 }
 function resultPanel(): string {
   const g = G!, o = UI.last!, mine = o.side === 0;
@@ -369,6 +408,8 @@ function resultPanel(): string {
     o.clutch ? `<span class="chip trait">Clutch +${o.clutchBonus}%</span>` : '',
     o.fireOn ? '<span class="chip good">ON FIRE</span>' : '', o.fireOff ? '<span class="chip">Fire out</span>' : '',
     o.extra ? '<span class="chip good">Extra possession</span>' : '',
+    o.rewound ? '<span class="chip bad">REWOUND</span>' : '',
+    ...(o.sp || []).filter(Boolean).map((n) => `<span class="chip sp">${icon('clutch')}${esc(n!)}</span>`),
     o.label ? `<span class="chip glitch l-${o.label.replace(' ', '-')}">${o.label}</span>` : '',
     o.inhuman ? '<span class="chip glitch l-INHUMAN">INHUMAN</span>' : '',
   ].join('');
@@ -377,12 +418,14 @@ function resultPanel(): string {
     ${o.turnover ? '' : `<div class="res-bar">${pbar(o.p, undefined, 'final')}<span class="dim small">${o.p}% shot</span></div>`}
     <div class="tags">${tags}</div>
     <ul class="why">${o.notes.slice(0, 3).map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
+    ${spRow()}
     <div class="pg-foot"><button class="btn sm" data-a="log">All the numbers</button><button class="btn go" data-a="next" id="nextBtn">${g.over ? 'Final whistle' : 'Next'}</button></div></div>`;
 }
 // ---------- play-by-play ----------
 function feedIcon(l: { kind: string; side: Side; n: number }): { svg: string; tone: string } {
   const g = G!;
   if (l.kind === 'sub') return { svg: icon('sub'), tone: 'plain' };
+  if (l.kind === 'info') return { svg: icon('clutch'), tone: 'hot' };
   const h = g.hist.find((x) => x.n === l.n && x.side === l.side);
   if (!h) return { svg: icon('ball'), tone: 'plain' };
   const m = mainIcon(h.outcome);
@@ -398,7 +441,9 @@ function inspectHTML(idx: number): string {
   const who = l.side === 0 ? 'You' : 'CPU';
   if (!o) return `<div class="ins-h"><span class="ins-ic">${icon('sub')}</span><b>${esc(l.text)}</b></div><ul class="why">${l.detail.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>`;
   const m = mainIcon(o);
-  const parts = o.parts.length ? o.parts.map(([n, v]) => `<li class="${v >= 0 ? 'up' : 'dn'}"><span>${esc(n)}</span><i style="--w:${Math.min(100, Math.abs(v) * 5)}%"></i><b>${v > 0 ? '+' : ''}${v}%</b></li>`).join('') : '<li class="dim"><span>No extra modifiers</span></li>';
+  // base -> every modifier row (the guess effect last) -> final bar: the numbers add up to the final chance
+  const row = ([n, v]: [string, number]): string => `<li class="${/^(Right guess|Read:|Shadowed)/.test(n) ? 'rd' : /^Wrong guess/.test(n) ? 'wg' : v >= 0 ? 'up' : 'dn'}"><span>${esc(n)}</span><i style="--w:${Math.min(100, Math.abs(v) * 5)}%"></i><b>${v > 0 ? '+' : ''}${v}%</b></li>`;
+  const parts = (o.base != null ? `<li class="base"><span>Base: rating vs defender</span><i style="--w:${Math.min(100, o.base)}%"></i><b>${o.base}%</b></li>` : '') + (o.parts.length ? o.parts.map(row).join('') : '<li class="dim"><span>No extra modifiers</span></li>');
   const oc = cardByName(o.offCard), dc = cardByName(o.defCard);
   const cardRow = (label: string, name: string | null, c?: { text: string }, cancelled = false) => name ? `<div class="ins-card${cancelled ? ' x' : ''}"><em>${label}</em><b>${esc(name)}</b>${c ? `<span>${esc(c.text)}</span>` : ''}${cancelled ? '<span>Cancelled before it counted.</span>' : ''}</div>` : '';
   const cards = cardRow(`${who} card`, o.countered ? null : o.offCard, oc) + (o.countered ? cardRow(`${who} card`, o.countered, cardByName(o.countered), true) : '') + cardRow(`${l.side === 0 ? 'CPU' : 'You'} card`, o.defCard, dc);
@@ -410,10 +455,10 @@ function inspectHTML(idx: number): string {
     o.guard && !o.iso ? `<span class="chip ${o.read ? (l.side === 0 ? 'bad' : 'good') : ''}">${SCHEME_NAME[o.guard]}: ${o.read ? 'READ' : 'wrong guess'}</span>` : '', o.iso ? '<span class="chip trait">ISO</span>' : '',
     o.dt ? '<span class="chip trap">Double team</span>' : '', o.clutch ? `<span class="chip trait">Clutch +${o.clutchBonus}%</span>` : '', o.fireOn ? '<span class="chip good">ON FIRE</span>' : '',
   ].join('');
-  const a1 = o.a1p ? `<p class="dim small">And-one chance on this Rim make: ${Math.round(o.a1p)}% (base ${TUNING.a1Base}%, dunkers and Bigs more, strong defenders less, +${TUNING.a1Beat}% when the guess was wrong).</p>` : '';
+  const a1 = o.a1p ? `<p class="dim small">And-one chance on this Rim make: <b>${Math.round(o.a1p)}%</b> = base ${TUNING.a1Base}%, dunkers and Bigs more, strong defenders less${o.guard && !o.read && !o.iso ? `, <span class="wg-t">+${TUNING.a1Beat}% because the guess was wrong</span>` : ''}.</p>` : '';
   return `<div class="ins-h"><span class="ins-ic t-${m.tone}">${icon(m.name)}</span><b>${esc(l.text)}</b></div>
     ${o.turnover ? '' : `<h4>Shot chance</h4><div class="ins-p">${pbar(o.p, undefined, 'final')}<b>${o.p}%</b></div><ul class="ins-parts">${parts}</ul>
-    <p class="dim small">Base chance comes from his rating vs the defender. The lines above are what moved it${o.read ? '; a right guess by the defense then multiplied it down' : ''}.</p>${a1}`}
+    <p class="dim small">Base + every line = the final chance${o.read ? '. The guess line is what a right guess by the defense took off' : ''}.</p>${a1}`}
     ${tags ? `<div class="tags">${tags}</div>` : ''}${cards ? `<h4>Cards</h4>${cards}` : ''}${traps}
     ${o.notes.length ? `<h4>What happened</h4><ul class="why">${o.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}`;
 }
@@ -442,7 +487,7 @@ function handHTML(): string {
   const g = G!, S = g.sides[0];
   const blocked = (i: number) => (UI.phase === 'result' ? 'Wait for the next possession.' : playBlock(g, 0, S.hand[i]));
   return `<div class="hand-bar"><span class="hb-lab">HAND <small>tap a card to play</small></span><span class="dim small">Deck ${S.deck.length} · discard ${S.discard.length}</span></div>
-    <div class="hand" aria-label="Your hand">${S.hand.map((c, i) => { const b = blocked(i), t = effectTag(c); return `<button class="hcard${c.cls ? ' pc-' + c.cls : ''} r-${c.rarity}${c.fx.trap ? ' is-trap sp-trap' : ' sp-spell'}${c.rarity === 'iconic' ? ' ic-gl' : ''}${b ? ' off' : ''}" data-a="card" data-v="${i}" aria-label="${esc(c.name)}: ${esc(c.text)}${b ? ' (' + esc(b) + ')' : ''}" title="${esc(b || c.text)}"><span class="hc-art" aria-hidden="true">${cardArt(c)}</span>
+    <div class="hand" aria-label="Your hand">${S.hand.map((c, i) => { const b = blocked(i), t = effectTag(c); return `<button class="hcard${c.cls ? ' pc-' + c.cls : ''} r-${c.rarity}${c.fx.trap ? ' is-trap sp-trap' : ' sp-spell'}${b ? ' off' : ''}" data-a="card" data-v="${i}" aria-label="${esc(c.name)}: ${esc(c.text)}${b ? ' (' + esc(b) + ')' : ''}" title="${esc(b || c.text)}"><span class="hc-art" aria-hidden="true">${cardArt(c)}</span>
       <span class="hc-cost" title="Momentum cost">${c.fx.allIn ? 'ALL' : costOf(g, 0, c)}</span><span class="hc-big">${esc(t.big)}</span><span class="hc-sm">${esc(t.small)}</span><b class="hc-name">${esc(c.name)}</b>${c.lv ? `<i class="hc-lv">Lv ${c.lv}</i>` : ''}${b && UI.phase !== 'result' ? `<i class="hc-why">${esc(b.replace('Needs ', 'Needs ').replace(' Momentum.', ' MO').replace('.', ''))}</i>` : ''}</button>`; }).join('') || '<span class="dim small">No cards in hand.</span>'}</div>`;
 }
 /** The enlarged card with its full text and the Play button. */
@@ -470,7 +515,12 @@ function ballerModal(): string {
   const canShoot2 = mineOff && shooterSlots(g, 0).includes(k.i);
   // a bench Baller is compared with the court Baller in the same position, or the first one
   const versus = k.bench ? S.team.find((t) => t.pos === b.pos) || S.team[0] : undefined;
-  return ballerCardHTML(b, { where: k.bench ? 'bench' : 'court', mine: k.side === 0, chances, zone: g.poss.zone, canShoot: canShoot2, isShooter: g.poss.shooter === k.i, versus });
+  let spx: CardCtx['special'];
+  if (b.special) {
+    const idx = k.bench ? -1 : k.i, why = b.spUsed ? '' : k.bench ? 'Sub him in first.' : k.side !== 0 ? '' : (specialBlock(g, 0, idx) || '');
+    spx = { state: b.spUsed ? 'used' : why ? 'wait' : 'ready', why, idx, mine: k.side === 0 && !k.bench, when: SP_WHEN_TEXT[SP_KINDS[b.special.type].when] };
+  }
+  return ballerCardHTML(b, { where: k.bench ? 'bench' : 'court', mine: k.side === 0, special: spx, chances, zone: g.poss.zone, canShoot: canShoot2, isShooter: g.poss.shooter === k.i, versus });
 }
 function subsModal(): string {
   const g = G!, S = g.sides[0];
@@ -605,6 +655,7 @@ function finishTutorial(): void {
     <p class="final">${score}</p>
     <p class="dim">Rookie Run · guided game</p>
     <p class="lore-line">${esc(won ? 'The Grid saw that. It does not forget.' : 'The Grid keeps score, not grudges.')}</p>
+    ${boxShortHTML(g)}
     ${first ? `<ul class="rw-list"><li><span>Tutorial reward</span><b>+${TUT_BUCKS} B$</b></li><li><span>Street Pack</span><b>free</b></li></ul><p class="earn pack">A free pack is waiting for you!</p>` : '<p class="dim small">Practice game: no rewards this time.</p>'}
     <div class="tut-ptr">${ptr.map(([v, t, d]) => `<button class="tut-p" data-a="tutgo" data-v="${v}"><b>${t}</b><small>${d}</small></button>`).join('')}</div>
     <div class="row end">${first ? '<button class="btn go" data-a="rewardpack">Open your free pack</button>' : ''}<button class="btn ghost" data-a="menu">Menu</button>${first ? '' : '<button class="btn go" data-a="tutorial">Play it again</button>'}</div></div>`;
@@ -646,6 +697,7 @@ function beginPoss(): void {
   fixShooter(g);
   if (tutActive()) applyScene(g);
   rerender();
+  flushSpEvents();
   if (!reduced()) {
     if (g.poss.dt && g.poss.off === 0) banner('DOUBLE TEAM', `${g.sides[0].team[g.poss.dt.mark].name} is marked. Find the open man.`, 'bad');
     else banner(g.poss.off === 0 ? 'YOUR BALL' : 'DEFENSE', g.poss.off === 0 ? 'Pick a shooter and a zone' : 'Guess their zone', g.poss.off === 0 ? 'cool' : 'hot');
@@ -880,6 +932,7 @@ async function doResolve(bonus: number): Promise<void> {
   await play(steps(o));
   UI.phase = 'result';
   rerender();
+  if (o.side === 0 && o.made && aiRewind(g, 1, (stage ?? STAGES[0]).skill)) { rerender(); flushSpEvents(); }
   if (!reduced()) {
     // teach the Momentum bar: say how much each bar moved
     ([0, 1] as Side[]).forEach((sd) => {
@@ -912,6 +965,8 @@ function finish(): void {
   const packs = R.packs.length;
   o.innerHTML = `<div class="modal end ${won ? 'win' : 'loss'}" role="dialog" aria-modal="true" aria-labelledby="endh">
     <h2 id="endh">${won ? (stageIdx === STAGES.length - 1 ? 'Champion!' : 'You win!') : 'Game over'}</h2>
+    <div class="end-tabs" role="tablist"><button class="on" role="tab" aria-selected="true" data-a="endtab" data-v="res">Result</button><button role="tab" aria-selected="false" data-a="endtab" data-v="box">Box score</button></div>
+    <div class="end-pane" data-pane="res">
     <p class="final">${g.sides[0].score} – ${g.sides[1].score}</p>
     <p class="dim">${esc(stage!.name)} · ${g.n} possessions</p>
     ${starRow}
@@ -919,14 +974,21 @@ function finish(): void {
     <p class="earn">+${R.bucks} Bucks · +${R.shards} shards</p>
     ${R.bossName ? `<p class="earn pack">Boss beaten: ${esc(R.bossName)}!</p>` : ''}${packs ? `<p class="earn pack">${packs === 1 ? 'A pack' : packs + ' packs'} won!</p>` : ''}
     ${R.milestones.length ? '<p class="earn pack">A star reward is ready to claim in Story.</p>' : ''}
+    </div><div class="end-pane" data-pane="box" hidden>${boxHTML(g)}</div>
     <div class="row end">${packs ? `<button class="btn go" data-a="rewardpack">Open ${packs === 1 ? 'your pack' : 'your packs'}</button>` : ''}
       <button class="btn ghost" data-a="menu">Menu</button>${next && !packs ? `<button class="btn go" data-a="story" data-v="${stageIdx + 1}">Next court</button>` : ''}
       <button class="btn${packs ? '' : ' go'}" data-a="rematch">${won ? 'Play again' : 'Try again'}</button></div></div>`;
   document.body.appendChild(o);
-  sfx(won ? 'reward' : 'groan');
+  if (won) {
+    // a heavy fanfare and a loop under the reward popup, and a neon confetti burst that grows with the margin
+    const margin = g.sides[0].score - g.sides[1].score;
+    sfx('victory', { level: Math.min(1, margin / 12) });
+    setMusicOverride('triumph', Math.min(1, 0.45 + margin / 20));
+    winFx(margin);
+  } else sfx('defeat');
   if (R.shards) setTimeout(() => sfx('shard'), 900);
 }
-const closeEnd = (): void => document.getElementById('endModal')?.remove();
+const closeEnd = (): void => { document.getElementById('endModal')?.remove(); setMusicOverride(null); };
 
 // ---------- clutch timing bar ----------
 function clutchBar(): Promise<number> {
@@ -975,6 +1037,7 @@ async function cpuShoots(): Promise<void> {
   const g = G!;
   aiOffense(g, 1, stage!.skill);
   let bonus = 0;
+  if (g.spq.length && !reduced()) { rerender(); flushSpEvents(); await new Promise((r) => setTimeout(r, 1100)); } else g.spq.length = 0;
   if (g.poss.clutch) { bonus = clutchTap(stage!.skill.sigma); if (!reduced()) { banner('CPU CLUTCH', CLUTCH_NAME[g.sides[1].coach], 'bad'); sfx('clutchRiser', { ms: 900 }); spikeTension(4); await new Promise((r) => setTimeout(r, 900)); } }
   rerender();
   await doResolve(bonus);
@@ -1023,6 +1086,15 @@ export function playAct(a: string, v: string | undefined): boolean {
     case 'autoshoes': autoShoes(); rerender(); return true;
     case 'story': closeEnd(); startGame(+v!); return true;
     case 'quick': startGame(-1); return true;
+    case 'endtab': {
+      const m = document.getElementById('endModal');
+      if (m) {
+        m.querySelectorAll<HTMLElement>('[data-pane]').forEach((e) => { e.hidden = e.dataset.pane !== v; });
+        m.querySelectorAll<HTMLElement>('.end-tabs button').forEach((e) => { const on = e.dataset.v === v; e.classList.toggle('on', on); e.setAttribute('aria-selected', String(on)); });
+        m.querySelector('.modal')?.scrollTo?.(0, 0);
+      }
+      return true;
+    }
     case 'rematch': closeEnd(); startGame(stageIdx); return true;
     case 'menu': closeEnd(); G = null; rerender(); return true;
     case 'rewardpack': closeEnd(); G = null; rerender(); openPending(); return true;
@@ -1040,9 +1112,20 @@ export function playAct(a: string, v: string | undefined): boolean {
     case 'cardclose': UI.cardView = null; rerender(); return true;
   }
   const g = G;
-  const mine = ['shooter', 'zone', 'card', 'cardplay', 'bcshoot', 'clutch', 'shoot', 'scheme', 'match', 'dt', 'lock', 'next', 'subs', 'sub', 'subsclose'];
+  const mine = ['special', 'shooter', 'zone', 'card', 'cardplay', 'bcshoot', 'clutch', 'shoot', 'scheme', 'match', 'dt', 'lock', 'next', 'subs', 'sub', 'subsclose'];
   if (!g || fxPlaying()) return !!g && mine.includes(a);
   switch (a) {
+    case 'special': {
+      const i = +v!, why = specialBlock(g, 0, i);
+      if (why) { UI.msg = why; rerender(); return true; }
+      const sp = g.sides[0].team[i].special!;
+      if (useSpecial(g, 0, i)) {
+        UI.card = null;
+        UI.msg = SP_KINDS[sp.type].bound ? `${g.sides[0].team[i].name} takes the shot. ${UI.phase === 'off' && !g.poss.zone ? 'Pick a zone.' : ''}` : '';
+        fixShooter(g); rerender(); flushSpEvents();
+      }
+      return true;
+    }
     case 'shooter': if (UI.phase === 'off' && shooterSlots(g, 0).includes(+v!)) { g.poss.shooter = +v!; UI.msg = ''; rerender(); tutNote('shooter', v); } return true;
     case 'zone': if (UI.phase === 'off' && !(g.poss.offCard?.fx.iso && v !== 'rim')) { g.poss.zone = v as Zone; UI.msg = ''; rerender(); tutNote('zone', v); } return true;
     case 'scheme': if (UI.phase === 'def') { g.poss.guard = v as Zone; UI.msg = ''; rerender(); tutNote('scheme', v); } return true;
