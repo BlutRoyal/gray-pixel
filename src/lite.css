@@ -1,0 +1,36 @@
+/* Lite mode (html.lite): the same game with the expensive layers removed. Set by src/ui/lite.ts. */
+html.lite *, html.lite *::before, html.lite *::after {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  mix-blend-mode: normal !important;
+  animation-iteration-count: 1 !important; /* endless loops become one-shots */
+}
+/* drop-shadow / blur / hue filters (state filters like grayscale on spent cards stay) */
+html.lite :not(.cc-img):not(.tok-img):not(.hcard):not(img) { filter: none !important; }
+/* full-screen overlay layers */
+html.lite .crt, html.lite body.crt-on .crt, html.lite .bg::before, html.lite .bg::after, html.lite .boot::before,
+html.lite .court-scan, html.lite .court-wrap::after, html.lite .bg-sun, html.lite .fx-glitch .gl-wash, html.lite .gl-slices,
+html.lite .opening.rays::before, html.lite .opening.rays-iconic::after, html.lite .sheen, html.lite .card::after, html.lite .hcard::after,
+html.lite .gl-layer { display: none !important; }
+html.lite .bg-grid { transform: none; opacity: .5; }
+/* cards: no tilt, no heavy shadows, no per-card holo layers */
+html.lite .card { transform: none !important; will-change: auto; box-shadow: 0 2px 6px rgba(0, 0, 0, .5) !important; }
+html.lite .card.holo::after { display: none !important; }
+html.lite .panel, html.lite .overlay { background-color: rgba(8, 10, 24, .96); }
+html.lite .tok.fire .tok-img, html.lite .pack-hit { box-shadow: none; }
+html.lite .boot-lite { opacity: .9; }
+/* the splash button exists in all modes */
+.boot-lite { position: relative; z-index: 3; margin-top: 18px; padding: 8px 14px; font: 700 11px var(--mono, monospace); letter-spacing: .12em; text-transform: uppercase; color: #cfd6e4; background: rgba(10, 14, 30, .7); border: 1px solid rgba(207, 214, 228, .35); border-radius: 6px; cursor: pointer; opacity: .65; }
+/* crash recovery card */
+.recover { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; background: rgba(3, 4, 12, .9); }
+.recover > div { max-width: 340px; width: 100%; padding: 18px; background: #0b0f22; border: 1px solid #ff4fd8; border-radius: 10px; color: #e6eaf5; font: 14px/1.4 system-ui, sans-serif; text-align: center; }
+.recover b { display: block; font-size: 18px; margin-bottom: 6px; }
+.recover p { margin: 0 0 12px; color: #9aa4bd; font-size: 12px; word-break: break-word; }
+.recover button { display: block; width: 100%; margin: 6px 0 0; padding: 11px; font: 700 13px system-ui, sans-serif; color: #fff; background: #1b2140; border: 1px solid #3a4470; border-radius: 6px; }
+.recover button[data-r="lite"] { background: #c026a3; border-color: #ff4fd8; }
+/* round 2B lite: possession effects stay but without glow filters, no pack-opening extras */
+html.lite .fx-hand, html.lite .fx-whistle { filter: none; }
+html.lite .spot.beaten .tok-img { filter: none; }
+/* round 2B lite: pack opening has one bounce and no glitch filters */
+html.lite .flip.glitching .flip-in, html.lite .flip.glitching .back-logo { animation: none !important; }
+html.lite .flip.solo .flip-in { transition-duration: .3s; }
+html.lite .sum-card { animation: none; }

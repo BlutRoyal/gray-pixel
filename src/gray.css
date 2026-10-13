@@ -1,0 +1,91 @@
+/* Gray Pixel: the neon tech-noir theme stays the base. Gray/white only seeps in as accents:
+   the stray pixel, gray static colliding with neon glitches, corner details, the boot screen. Loaded after theme.css. */
+:root {
+  --g1: #14181d; --g3: #2b323b; --g5: #66707d; --g6: #98a1ad; --g7: #c4cad2; --g8: #e4e7eb; --g9: #f6f7f9;
+  --display: 'Silkscreen', 'Courier New', monospace;
+  --body: 'Pixelify Sans', 'Space Mono', ui-monospace, monospace;
+  --px: 'Press Start 2P', 'Silkscreen', monospace;
+  --static: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .75 0 0 0 0 .78 0 0 0 0 .82 0 0 0 1.6 -.55'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* readable body: pixel-ish body at 16px, mono for numbers, log, inspector and tooltips */
+body { font-size: 16px; line-height: 1.45; }
+.plog, .log-ins, .cc-stats, .tok, .sb-num, .jb-num, .tut-bubble, .tut, [role='tooltip'] { font-family: var(--mono); }
+.plog li, .log-ins, .log-ins p { font-family: var(--mono); font-size: 12.5px; line-height: 1.4; }
+.small { font-size: 13.5px; } .dim { color: #a3adc6; }
+.tt-tag, .walkout b, .gl-title b { font-family: var(--px); }
+.tt-tag { letter-spacing: .12em; font-size: clamp(10px, 2vw, 13px); }
+.sb-num { font-family: var(--px); font-size: 32px; }
+.h, .tt-btn b, .btn.go { font-family: var(--display); font-weight: 700; }
+
+/* wordmark */
+.wm { display: block; overflow: visible; width: 100%; height: auto; }
+.wm-t { fill: var(--g9); } .wm-s { fill: var(--g5); } .wm-b { fill: var(--cyan); transform: translate(-.5px, 0); opacity: .9; } .wm-a { fill: var(--magenta); transform: translate(.5px, .12px); opacity: .9; }
+.wm-t path, .wm-s path { fill: inherit; } .wm-b path, .wm-a path { fill: inherit; }
+.wm-amp { opacity: 0; } .wm-amp, .wm-ay { animation-duration: 11s; animation-timing-function: steps(1); animation-iteration-count: infinite; }
+.wm-amp { animation-name: wmamp; } .wm-ay { animation-name: wmay; }
+@keyframes wmamp { 0%, 38.8%, 39.6%, 40.4%, 71.6%, 100% { opacity: 0; } 38% { opacity: 1; } 39.6% { opacity: 1; } 71% { opacity: 1; } }
+@keyframes wmay { 0%, 38.8%, 39.6%, 40.4%, 71.6%, 100% { opacity: 1; } 38% { opacity: 0; } 39.6% { opacity: 0; } 71% { opacity: 0; } }
+html.lite .wm-amp, html.lite .wm-ay { animation: none !important; } html.lite .wm-amp { opacity: 0; }
+.wm-stray, .stray { fill: var(--g6); }
+.wm-stray { animation: strayblink 5s steps(1) infinite; }
+@keyframes strayblink { 0%, 62%, 100% { fill: var(--g6); transform: none; } 64% { fill: var(--g9); } 66% { fill: transparent; } 68% { fill: var(--g9); transform: translate(-1px, 0); } 70% { fill: var(--g6); transform: none; } }
+.wm-title { width: min(640px, 88vw); margin: 0 auto; filter: drop-shadow(0 0 14px rgba(25, 246, 255, .35)); animation: wmglitch 7s steps(1) infinite; }
+.wm-top { width: 132px; }
+.wm-boot { width: min(420px, 80vw); }
+@keyframes wmglitch { 0%, 90%, 94%, 100% { transform: none; } 91% { transform: translate(-3px, 0); clip-path: inset(0 0 55% 0); } 92% { transform: translate(3px, 1px); clip-path: inset(50% 0 0 0); } 93% { transform: skewX(6deg); clip-path: none; filter: grayscale(1) brightness(1.4); } }
+.tt-wm { margin: 6px 0 4px; } .tt-head h1.tt-wm { background: none; filter: none; font-size: 0; }
+.logo { filter: none; background: none; }
+.logo-sub { color: var(--g7); }
+
+/* the stray pixel as an element */
+i.stray { display: inline-block; width: 6px; height: 6px; background: var(--g6); pointer-events: none; }
+i.stray.flash { position: fixed; z-index: 95; width: 8px; height: 8px; background: var(--g8); animation: strayflash .7s steps(1) forwards; box-shadow: -3px 0 0 var(--magenta), 3px 0 0 var(--cyan); }
+@keyframes strayflash { 0%, 30%, 60% { opacity: 1; } 15%, 45%, 100% { opacity: 0; } }
+.pa-logo { position: relative; line-height: 1.15; font-family: var(--display); font-weight: 700; text-align: center; -webkit-text-fill-color: transparent; }
+.pa-stray { position: absolute; right: -9px; top: -10px; width: 5px; height: 5px; -webkit-text-fill-color: initial; }
+.pack-art.big .pa-stray { width: 9px; height: 9px; right: -16px; top: -16px; }
+.back-logo { position: relative; font-family: var(--px); }
+.back-stray { position: absolute; right: -14px; top: -4px; width: 8px; height: 8px; animation: strayblink 4s steps(1) infinite; }
+.card .ic-stray { position: absolute; z-index: 6; top: 6px; right: 10px; width: 5px; height: 5px; background: var(--g8); box-shadow: -2px 0 0 var(--magenta), 2px 0 0 var(--cyan); animation: icstray 4.2s steps(1) infinite; }
+@keyframes icstray { 0%, 60% { opacity: 1; transform: none; } 61% { opacity: 0; } 63% { opacity: 1; transform: translate(-30px, 40px); } 66% { opacity: 1; transform: translate(14px, 80px); } 68%, 100% { opacity: 1; transform: none; } }
+.gl-title .gl-stray { position: absolute; top: -26px; left: 58%; width: 12px; height: 12px; background: var(--g9); box-shadow: -4px 0 0 var(--magenta), 4px 0 0 var(--cyan); animation: gltitle .35s steps(2) infinite; }
+
+/* gray static colliding with neon */
+.boot { background: #05060a; }
+.boot::before { content: ''; position: absolute; inset: 0; background: var(--static); opacity: .16; animation: staticshift .4s steps(4) infinite; pointer-events: none; }
+@keyframes staticshift { 25% { background-position: 30px -20px; } 50% { background-position: -40px 10px; } 75% { background-position: 10px 50px; } }
+.boot-in { position: relative; align-items: stretch; }
+.boot-t { display: block; } .boot li:nth-child(3) { color: var(--g8); } .boot li:nth-child(3)::after { content: ' ▪'; color: var(--g6); }
+.boot ol { font-size: 13px; }
+.glitch-in { animation: glitchin2 .42s steps(8) both; }
+@keyframes glitchin2 { 0% { opacity: 0; transform: translateX(-8px) skewX(4deg); filter: grayscale(1) brightness(1.5) drop-shadow(4px 0 0 rgba(255, 43, 214, .8)); }
+  30% { opacity: 1; transform: translateX(5px); clip-path: inset(0 0 55% 0); filter: grayscale(1) contrast(1.3) drop-shadow(-4px 0 0 rgba(25, 246, 255, .8)); } 55% { clip-path: inset(40% 0 0 0); transform: translateX(-3px); filter: hue-rotate(60deg); } 100% { opacity: 1; transform: none; filter: none; clip-path: none; } }
+.bg::before { content: ''; position: absolute; inset: 0; background: var(--static); opacity: .035; mix-blend-mode: screen; pointer-events: none; }
+.fx-glitch .gl-wash::after { content: ''; position: absolute; inset: 0; background: var(--static); opacity: .35; }
+.pack-hit.ripping .pack-art, .opening.rays::before { }
+.opening::before { content: ''; position: fixed; inset: 0; background: var(--static); opacity: .05; pointer-events: none; }
+/* corners: a steel-white bracket beside the neon ones, rare panels get a gray rim */
+.panel::before { border-color: var(--g8); filter: drop-shadow(0 0 3px rgba(228, 231, 235, .6)); }
+.modal { border-color: rgba(196, 202, 210, .35); }
+@media (max-width: 520px) { .sb-num { font-size: 24px; } .wm-top { width: 104px; } }
+@media (prefers-reduced-motion: reduce) { .wm-ay, .wm-amp, .wm-stray, .wm-title, .boot::before, .back-stray, .card .ic-stray, i.stray.flash { animation: none !important; } }
+
+/* splash: one boot title screen, then any tap/key enters */
+.boot.splash { animation: none; cursor: pointer; z-index: 90; }
+.boot.splash.out { animation: splashout .42s steps(6) forwards; }
+@keyframes splashout { 0% { filter: none; } 30% { filter: grayscale(1) brightness(1.6) drop-shadow(6px 0 0 var(--magenta)); transform: translateX(-6px); } 60% { clip-path: inset(0 0 50% 0); transform: translateX(6px); } 100% { opacity: 0; visibility: hidden; } }
+.boot-in { align-items: center; text-align: center; gap: 12px; }
+.boot-sub { margin: 0; font: 700 clamp(11px, 2.6vw, 14px) var(--display); letter-spacing: .24em; text-transform: uppercase; color: var(--g7); }
+.boot ol { align-self: center; text-align: left; font-family: var(--mono); font-size: 12.5px; }
+.boot-bar { align-self: stretch; }
+.boot-go { margin: 10px 0 0; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; opacity: 0; animation: bootline .3s 1.7s forwards; }
+.boot-go b { font: 400 clamp(16px, 4.4vw, 24px) var(--px); letter-spacing: .1em; text-transform: uppercase; color: #fff; text-shadow: -2px 0 var(--magenta), 2px 0 var(--cyan); animation: gopulse 1.1s steps(2) infinite; }
+.boot-go small { font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--g6); }
+.boot-go i.stray { position: absolute; top: -16px; right: 8%; animation: strayblink 3s steps(1) infinite; }
+@keyframes gopulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .boot-go b { animation: none; } .boot.splash.out { animation: none; opacity: 0; } }
+.tt-head .tt-tag { margin-top: 16px; text-shadow: 0 0 10px rgba(255, 176, 0, .35); }
+.tt-head h1.tt-wm { margin: 14px 0 0; line-height: 0; }
+.logo-sub { font: 700 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.plog, .plog *, .log-ins, .log-ins * { font-family: var(--mono); } .plog .h3 { font-family: var(--display); }
