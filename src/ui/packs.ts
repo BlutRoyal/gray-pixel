@@ -3,7 +3,7 @@ import { TIERS, TIER_NAME, rnd, seedRng, tierRank, type Tier } from '../rules';
 import { BALLER_PACKS, PACKS, SNEAKER_PACKS, isBox, openPack, oddsPct, packChance, packDef, type Odds, type PackDef, type Pull } from '../casual/packs';
 import { SHARD_YIELD } from '../casual/progress';
 import { addPull, profile, save, setMusic, spend } from './store';
-import { glitchSting, startPackMusic, sting, stopPackMusic, thump } from './beat';
+import { chargeRumble, glitchSting, pullChime, startPackMusic, sting, stopPackMusic, thump } from './beat';
 import { liteOn } from './lite';
 import { PACK_LINES } from './lore';
 import { strayHTML } from './wordmark';
@@ -77,7 +77,7 @@ interface Opening {
   anim: Animation | null; timers: number[];
 }
 let OP: Opening | null = null;
-const CHARGE_MS: Record<Tier, number> = { common: 160, uncommon: 320, rare: 600, epic: 1100, legendary: 1900, iconic: 2800 };
+const CHARGE_MS: Record<Tier, number> = { common: 650, uncommon: 850, rare: 1600, epic: 2200, legendary: 3300, iconic: 4200 };
 
 function faceHTML(p: Pull, isNew: boolean): string {
   const o = { holo: p.holo, isNew };
@@ -191,7 +191,15 @@ function stageHTML(op: Opening): string {
     <div class="op-top"><span class="op-count">Card <b>${i + 1}</b> of ${n}</span><span class="op-dots" aria-hidden="true">${op.pulls.map((_x, k) => `<i class="${k < i ? 'done' : k === i ? 'now' : ''}"></i>`).join('')}</span><button class="btn sm" data-a="opskip">Skip all</button></div>
     <div class="op-slot"><div class="flip solo t-${p.tier}" id="opCard" aria-label="Card ${i + 1} of ${n}, face down">
       <span class="flip-in"><span class="back"><span class="back-logo">G${strayHTML('back-stray')}</span><span class="back-ring"></span></span><span class="front">${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</span></span></div></div>
-    <p class="op-hint" id="opHint">&nbsp;</p></div>`;
+    <p class="op-hint" id="opHint">&nbsp;</p>
+    <button class="btn op-next" id="opNextBtn" data-a="opnext">Tap to skip</button></div>`;
+}
+/** The big bottom button: a quiet "skip" while the card drops and charges, a glowing NEXT CARD once it is face up. */
+function nextBtn(label: string, ready: boolean): void {
+  const b = document.getElementById('opNextBtn');
+  if (!b) return;
+  b.textContent = label;
+  b.classList.toggle('go', ready); b.classList.toggle('ready', ready);
 }
 function showCards(): void { OP!.i = 0; OP!.mode = 'card'; dealCard(); }
 function dealCard(): void {
@@ -206,7 +214,7 @@ function dealCard(): void {
   const { keys, dur, hits } = dropFrames(r.top + r.height + 30, bouncesFor(p.tier));
   op.anim = el.animate(keys, { duration: dur, fill: 'forwards' });
   hits.forEach((h, k) => later(() => { thump(h.power); if (k === 0 && tierRank(p.tier) >= 4 && !liteOn()) { document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake'); } }, h.t));
-  hint.textContent = 'Tap to skip the drop';
+  hint.textContent = 'Face down...';
   later(land, dur);
 }
 /** The card has landed: charge in its tier colour (longer and louder for rarer cards), then flip. */
@@ -219,10 +227,12 @@ function land(): void {
   if (!el) return;
   const hint = o.querySelector('#opHint')!;
   const rank = tierRank(p.tier);
-  const ms = reduced() ? 0 : liteOn() ? Math.min(CHARGE_MS[p.tier], 700) : CHARGE_MS[p.tier];
+  const ms = reduced() ? 0 : CHARGE_MS[p.tier];
+  el.style.setProperty('--cms', ms + 'ms');
   el.classList.add('charging');
+  if (!reduced()) chargeRumble(ms, rank, op.i, liteOn());
   if (p.tier === 'iconic' && !liteOn() && !reduced()) { el.classList.add('glitching'); glitchSting(2); }
-  hint.textContent = rank >= 3 ? 'Something is compiling...' : '...';
+  hint.textContent = rank >= 4 ? 'Something huge is compiling...' : rank >= 2 ? 'Something is compiling...' : '...';
   later(reveal, ms);
 }
 function reveal(): void {
@@ -235,11 +245,17 @@ function reveal(): void {
   el.classList.add('flipped');
   el.setAttribute('aria-label', `${TIER_NAME[p.tier]} card`);
   const rank = tierRank(p.tier);
-  if (rank >= 3 || p.holo) burst(el, p.tier);
+  if (rank >= 1 || p.holo) burst(el, p.tier);
+  if (rank >= 4) rain(p.tier);
+  const prevMax = op.pulls.slice(0, op.i).reduce((m, q) => Math.max(m, tierRank(q.tier)), -1);
+  const newBest = op.i > 0 && rank > prevMax && rank >= 2;
+  pullChime(op.i, op.pulls.length, rank, newBest, liteOn());
   if (rank >= 2) sting(rank >= 5 ? 'iconic' : rank >= 4 ? 'big' : 'rare');
   const last = op.i === op.pulls.length - 1;
   const hint = o.querySelector('#opHint');
-  if (hint) hint.textContent = `${TIER_NAME[p.tier]}${p.holo ? ' · Holo' : ''}${op.isNew[op.i] ? ' · NEW' : ''} · tap for ${last ? 'the summary' : 'the next card'}`;
+  if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · Holo' : ''}${op.isNew[op.i] ? ' · NEW' : ''}`;
+  if (newBest && !reduced()) { el.classList.add('newbest'); later(() => el.classList.remove('newbest'), 1400); }
+  nextBtn(last ? 'SEE SUMMARY' : 'NEXT CARD', true);
 }
 /** A tap: skip the drop, skip the charge, or go to the next card (the last one opens the summary). */
 function next(): void {
@@ -258,15 +274,31 @@ function showSummary(): void {
   op.mode = 'sum';
   delete o.dataset.a;
   const news = op.isNew.filter(Boolean).length;
+  const bestI = op.pulls.reduce((m, p, k) => (tierRank(p.tier) > tierRank(op.pulls[m].tier) ? k : m), 0);
   const lines = [news ? `${news} new card${news > 1 ? 's' : ''} added to your collection.` : 'Nothing new this time.'];
   if (op.shards) lines.push(`Duplicates gave ${op.shards} shards (shared pool, spend them on Baller levels in Collection).`);
   if (op.cardShards) lines.push(`Duplicate Play cards gave ${op.cardShards} shards to those cards only.`);
   const P = profile();
   o.innerHTML = `<div class="op-stage sum"><h2 class="h">${esc(op.def.name)} opened</h2>
-    <div class="sum-grid">${op.pulls.map((p, i) => `<div class="sum-card t-${p.tier}" style="--i:${i}">${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</div>`).join('')}</div>
+    <div class="sum-grid">${op.pulls.map((p, i) => `<div class="sum-card t-${p.tier}${i === bestI ? ' best' : ''}" style="--i:${i}">${i === bestI ? '<span class="best-tag">BEST PULL</span>' : ''}${faceHTML(p, op.isNew[i])}${dupeHTML(p)}</div>`).join('')}</div>
     <p class="op-hint sum-note">${esc(PACK_LINES.done)} ${lines.map(esc).join(' ')}</p>
     <div class="row center"><button class="btn ghost" data-a="opclose">Done</button>${P.pending.length ? `<button class="btn go" data-a="openpending">Open next won pack (${P.pending.length})</button>` : ''}${P.bucks >= op.def.price ? `<button class="btn${P.pending.length ? '' : ' go'}" data-a="buy" data-v="${op.def.id}">Open another (${op.def.price})</button>` : ''}</div></div>`;
   o.scrollTop = 0;
+}
+/** Golden (or glitch-pink) particles falling from the top; skipped in lite mode and with reduced motion. */
+function rain(tier: Tier): void {
+  if (reduced() || liteOn()) return;
+  const n = tier === 'iconic' ? 46 : 30;
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('i');
+    d.className = 'rain t-' + tier;
+    d.style.left = rnd() * 100 + 'vw';
+    d.style.setProperty('--rd', 1.3 + rnd() * 1.4 + 's');
+    d.style.setProperty('--rw', rnd() * 0.9 + 's');
+    d.style.setProperty('--rs', 4 + rnd() * 6 + 'px');
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3000);
+  }
 }
 function burst(el: HTMLElement, tier: Tier): void {
   if (reduced()) return;

@@ -263,3 +263,31 @@ export function stopPackMusic(): void {
   stopBeat();
 }
 export const packMusicIsFile = (): boolean => usingFile;
+
+// ---------- pack opening: charge rumble and a reveal chime that climbs with every card ----------
+const climbMul = (i: number): number => Math.pow(2, Math.min(i, 9) * 2 / 12); // a whole step up per card
+/** A rising rumble while the card charges: low saw swept upward under a lowpass, louder for rarer cards. Lite: one plain sine, no noise. */
+export function chargeRumble(ms: number, rank: number, i: number, lite = false): void {
+  if (!ac() || rank < 1) return;
+  const t = ctx!.currentTime + 0.01, d = ms / 1000, m = climbMul(i), g = ctx!.createGain();
+  const peak = 0.05 + rank * 0.03;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + d * 0.9); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.05);
+  const f = ctx!.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(260, t); f.frequency.exponentialRampToValueAtTime(260 + rank * 500, t + d);
+  const o = ctx!.createOscillator(); o.type = lite ? 'sine' : 'sawtooth';
+  o.frequency.setValueAtTime(55 * m, t); o.frequency.exponentialRampToValueAtTime((110 + rank * 30) * m, t + d);
+  o.connect(f).connect(g).connect(out()); o.start(t); o.stop(t + d + 0.1);
+  if (!lite && rank >= 3) hiss(t + d * 0.5, d * 0.5, 0.05 * rank, 2500);
+}
+/** The reveal: a chime whose pitch climbs with the card number; richer for rarer pulls, plus an extra rising beat for a new best pull. */
+export function pullChime(i: number, _n: number, rank: number, newBest: boolean, lite = false): void {
+  if (!ac()) return;
+  const t = ctx!.currentTime + 0.02, m = climbMul(i), base = 523.3 * m;
+  const notes = rank >= 4 ? [1, 1.25, 1.5, 2] : rank >= 2 ? [1, 1.25, 1.5] : rank >= 1 ? [1, 1.5] : [1];
+  notes.forEach((r, k) => tone('triangle', base * r, base * r * 1.004, t + k * 0.07, 0.35, 0.16));
+  if (!lite && rank >= 3) tone('sine', base * 0.5, base * 0.5, t, 0.6, 0.18);
+  if (newBest) {
+    const t2 = t + 0.32;
+    [1.5, 2, 2.5, 3].forEach((r, k) => tone('square', base * r, base * r, t2 + k * 0.06, 0.18, 0.06));
+    if (!lite) hiss(t2, 0.3, 0.1, 6000);
+  }
+}

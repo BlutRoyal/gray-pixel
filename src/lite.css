@@ -34,3 +34,8 @@ html.lite .spot.beaten .tok-img { filter: none; }
 html.lite .flip.glitching .flip-in, html.lite .flip.glitching .back-logo { animation: none !important; }
 html.lite .flip.solo .flip-in { transition-duration: .3s; }
 html.lite .sum-card { animation: none; }
+
+/* pack opening, lite: same delay and Next button, cheaper effects (no brightness filters, no rain, no glow pulse) */
+html.lite .flip.solo.charging .back { animation-name: buildglow-s !important; }
+html.lite .flip.solo.newbest, html.lite .op-next.ready, html.lite .rain { animation: none; }
+html.lite .rain { display: none; }
