@@ -5,7 +5,9 @@ import { bandTeam, buildDeck, cBaller, cpuDeck, equip, newSide, simGame, starter
 import { STAGES, cpuSide } from '../casual/story';
 import { allCards } from '../casual/cards';
 import { addBucks, profile, resetProfile, save, setCrt, setFast } from './store';
-import { glitchSting, packFileName, setPackFile, startPackMusic, stopPackMusic } from './beat';
+import { SOUNDS, type SfxName } from './sounds';
+import { sfx } from './sfx';
+import { MUSIC_CTXS, musicFileName, musicNow, musicTest, setMusicFile, setMusicTest, type MusicCtx } from './music';
 import { glitchSlam, setSpeed } from './fx';
 import { esc } from './views';
 import { liteLabel, liteOn, liteWhy } from './lite';
@@ -22,7 +24,6 @@ let onChange: () => void = () => {};
 let quickN = 200;
 let quick: string[] | null = null;
 let tuneMsg = '';
-let packTest = false;
 let jsonText = '';
 export function initLab(changed: () => void): void {
   onChange = changed;
@@ -30,7 +31,7 @@ export function initLab(changed: () => void): void {
     const el = e.target as HTMLInputElement;
     if (el.dataset?.tune) { setTune(el.dataset.tune as TuneKey, +el.value); tuneMsg = ''; }
     else if (el.id === 'tune-json') jsonText = el.value;
-    else if (el.id === 'pack-file') { const f = el.files && el.files[0]; if (f) void setPackFile(f).then(onChange); }
+    else if (el.id?.startsWith('music-file-')) { const f = el.files && el.files[0]; if (f) void setMusicFile(el.id.slice(11) as MusicCtx, f).then(onChange); }
     else if (el.id === 'quick-n') quickN = Math.max(20, Math.min(2000, +el.value || 200));
   });
 }
@@ -98,11 +99,15 @@ export function labHTML(): string {
     <button class="btn" data-a="lab-sting" data-v="1">Preview GLITCHED</button><button class="btn" data-a="lab-sting" data-v="2">OVERCLOCKED</button><button class="btn" data-a="lab-sting" data-v="3">SYSTEM ERROR</button></div>
     <h3 class="small">Possession animation preview (opens a Quick Play game)</h3>
     <div class="row">${[['make', 'Three'], ['rim', 'Rim'], ['miss', 'Miss'], ['block', 'Block'], ['steal', 'Steal'], ['dt', 'Double team'], ['fire', 'On Fire'], ['g1', 'GLITCHED'], ['g2', 'OVERCLOCKED'], ['g3', 'SYSTEM ERROR']].map(([k, t]) => `<button class="btn sm" data-a="lab-prev" data-v="${k}">${t}</button>`).join('')}</div>
-    <h3 class="small">Pack-opening music</h3>
-    <p class="dim small">Default is the built-in Web Audio beat. To use your own track, choose an audio file here (kept in this browser), or put an mp3 at <code>audio/pack.mp3</code> next to <code>index.html</code>. ${packFileName() ? `<b>Using: ${esc(packFileName())}</b>` : 'No custom file chosen.'}</p>
-    <div class="row"><label class="btn file-btn">Choose audio file<input type="file" id="pack-file" accept="audio/*"></label>
-    <button class="btn" data-a="pack-clear" ${packFileName() ? '' : 'disabled'}>Back to built-in beat</button>
-    <button class="btn" data-a="pack-test">${packTest ? 'Stop test' : 'Play test'}</button></div></section>
+    <h3 class="small">Sound</h3>
+    <div class="row"><button class="btn go" data-a="sound">Sound settings (volume, mute)</button></div>
+    <div class="row lab-sfx">${(Object.keys(SOUNDS) as SfxName[]).map((k) => `<button class="btn sm" data-a="lab-sfx" data-v="${k}">${k}</button>`).join('')}</div>
+    <h3 class="small">Music per context</h3>
+    <p class="dim small">Each context has a built-in loop (title and menus, in-game tension that rises with Momentum, pack opening). To use your own track instead, choose an audio file (kept in this browser), or put <code>audio/title.mp3</code>, <code>audio/game.mp3</code> or <code>audio/pack.mp3</code> next to <code>index.html</code>. Any failure falls back to the built-in loop. Playing now: <b>${esc(musicNow() || 'nothing')}</b>.</p>
+    ${MUSIC_CTXS.map((c) => `<div class="row lab-music"><b>${c}</b><span class="dim small">${musicFileName(c) ? 'Using: ' + esc(musicFileName(c)) : 'Built-in loop'}</span>
+      <label class="btn sm file-btn">Choose file<input type="file" id="music-file-${c}" accept="audio/*"></label>
+      <button class="btn sm" data-a="mus-clear" data-v="${c}" ${musicFileName(c) ? '' : 'disabled'}>Built-in</button>
+      <button class="btn sm" data-a="mus-test" data-v="${c}">${musicTest() === c ? 'Stop test' : 'Play test'}</button></div>`).join('')}</section>
   <section class="panel"><h2 class="h">Dev tools</h2>
     <div class="row"><button class="btn" data-a="tutorial">Replay tutorial</button>
     <button class="btn" data-a="dev-bucks">+500 Bucks</button>
@@ -165,9 +170,10 @@ export function labAct(a: string, v: string | undefined): boolean {
     case 'dev-iconic': freePack('icon', true); return true;
     case 'lab-prev': previewPlay(v!); return true;
     case 'lab-fast': setFast(!profile().fast); setSpeed(profile().fast ? 0.45 : 1); onChange(); return true;
-    case 'lab-sting': { const l = +v! as 1 | 2 | 3; glitchSting(l); glitchSlam(l, ['', 'GLITCHED', 'OVERCLOCKED', 'SYSTEM ERROR'][l], 'preview', l === 3 ? 'ROGUE RENDER' : ''); return true; }
-    case 'pack-clear': void setPackFile(null).then(onChange); return true;
-    case 'pack-test': if (packTest) { stopPackMusic(); packTest = false; } else { startPackMusic(); packTest = true; } onChange(); return true;
+    case 'lab-sting': { const l = +v! as 1 | 2 | 3; sfx(('glitch' + l) as SfxName); glitchSlam(l, ['', 'GLITCHED', 'OVERCLOCKED', 'SYSTEM ERROR'][l], 'preview', l === 3 ? 'ROGUE RENDER' : ''); return true; }
+    case 'lab-sfx': sfx(v as SfxName, { rank: 3, level: 0.8, ms: 1400, i: 2, power: 1 }); return true;
+    case 'mus-clear': void setMusicFile(v as MusicCtx, null).then(onChange); return true;
+    case 'mus-test': setMusicTest(musicTest() === v ? null : (v as MusicCtx)); onChange(); return true;
     case 'crt': setCrt(!profile().crt); onChange(); return true;
     case 'reset': if (!confirmReset) { confirmReset = true; onChange(); return true; } resetProfile(); confirmReset = false; onChange(); return true;
   }

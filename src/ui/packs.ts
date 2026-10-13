@@ -3,7 +3,8 @@ import { TIERS, TIER_NAME, rnd, seedRng, tierRank, type Tier } from '../rules';
 import { BALLER_PACKS, PACKS, SNEAKER_PACKS, isBox, openPack, oddsPct, packChance, packDef, type Odds, type PackDef, type Pull } from '../casual/packs';
 import { SHARD_YIELD } from '../casual/progress';
 import { addPull, profile, save, setMusic, spend } from './store';
-import { chargeRumble, glitchSting, pullChime, startPackMusic, sting, stopPackMusic, thump } from './beat';
+import { sfx } from './sfx';
+import { setMusicOverride } from './music';
 import { liteOn } from './lite';
 import { PACK_LINES } from './lore';
 import { strayHTML } from './wordmark';
@@ -98,7 +99,7 @@ export function openPending(): void {
 function open(id: string, free: boolean, forceIconic = false): void {
   const def = packDef(id), P = profile();
   if (!free && !spend(def.price)) return;
-  if (P.music) startPackMusic();
+  setMusicOverride(P.music ? 'pack' : 'none');
   seedRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
   // pity counts every pack of this kind, bought or won: every Nth one holds the guarantee
   P.pity[id] = (P.pity[id] || 0) + 1;
@@ -154,14 +155,17 @@ function rip(): void {
   const btn = o.querySelector('.pack-hit') as HTMLElement;
   // a walkout-style hint: the tear flashes in the colour of the best card inside
   btn.classList.add('ripping', 'best-' + TIERS[best]);
-  if (best >= 4 && !reduced()) {
-    o.classList.add('rays', 'rays-' + TIERS[best]);
-    sting(best >= 5 ? 'iconic' : 'big');
+  const wait = liteOn() ? Math.min(900, best >= 5 ? 1400 : 700) : best >= 5 ? 2200 : best >= 4 ? 1500 : 900;
+  if (!reduced()) {
+    sfx('packRip', { rank: best });
+    // the walkout builds while the pack tears: a rising charge scaled to the best card inside
+    if (best >= 2) sfx('packCharge', { ms: wait - 200, rank: best, i: 0 });
   }
+  if (best >= 4 && !reduced()) o.classList.add('rays', 'rays-' + TIERS[best]);
   const hint = o.querySelector('.op-hint');
   if (hint) hint.textContent = PACK_LINES.rendering[best % PACK_LINES.rendering.length];
   const done = () => { op.busy = false; o.classList.remove('rays', 'rays-legendary', 'rays-iconic'); showCards(); };
-  if (reduced()) done(); else later(done, liteOn() ? Math.min(900, best >= 5 ? 1400 : 700) : best >= 5 ? 2200 : best >= 4 ? 1500 : 900);
+  if (reduced()) done(); else later(done, wait);
 }
 /** Keyframes of a basketball drop: from above the screen, bounces (each lower than the last), a squash at every floor hit. Heights in px. */
 export function dropFrames(y0: number, bounces: number[]): { keys: Keyframe[]; dur: number; hits: { t: number; power: number }[] } {
@@ -213,7 +217,7 @@ function dealCard(): void {
   const r = el.getBoundingClientRect();
   const { keys, dur, hits } = dropFrames(r.top + r.height + 30, bouncesFor(p.tier));
   op.anim = el.animate(keys, { duration: dur, fill: 'forwards' });
-  hits.forEach((h, k) => later(() => { thump(h.power); if (k === 0 && tierRank(p.tier) >= 4 && !liteOn()) { document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake'); } }, h.t));
+  hits.forEach((h, k) => later(() => { sfx('bounce', { power: h.power }); if (k === 0 && tierRank(p.tier) >= 4 && !liteOn()) { document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake'); } }, h.t));
   hint.textContent = 'Face down...';
   later(land, dur);
 }
@@ -230,8 +234,8 @@ function land(): void {
   const ms = reduced() ? 0 : CHARGE_MS[p.tier];
   el.style.setProperty('--cms', ms + 'ms');
   el.classList.add('charging');
-  if (!reduced()) chargeRumble(ms, rank, op.i, liteOn());
-  if (p.tier === 'iconic' && !liteOn() && !reduced()) { el.classList.add('glitching'); glitchSting(2); }
+  if (!reduced()) sfx('packCharge', { ms, rank, i: op.i });
+  if (p.tier === 'iconic' && !liteOn() && !reduced()) { el.classList.add('glitching'); sfx('glitch2'); }
   hint.textContent = rank >= 4 ? 'Something huge is compiling...' : rank >= 2 ? 'Something is compiling...' : '...';
   later(reveal, ms);
 }
@@ -249,8 +253,7 @@ function reveal(): void {
   if (rank >= 4) rain(p.tier);
   const prevMax = op.pulls.slice(0, op.i).reduce((m, q) => Math.max(m, tierRank(q.tier)), -1);
   const newBest = op.i > 0 && rank > prevMax && rank >= 2;
-  pullChime(op.i, op.pulls.length, rank, newBest, liteOn());
-  if (rank >= 2) sting(rank >= 5 ? 'iconic' : rank >= 4 ? 'big' : 'rare');
+  sfx(rank >= 5 ? 'iconicHit' : 'packReveal', { rank, i: op.i, newBest });
   const last = op.i === op.pulls.length - 1;
   const hint = o.querySelector('#opHint');
   if (hint) hint.textContent = `${newBest ? 'NEW BEST PULL · ' : ''}${TIER_NAME[p.tier]}${p.holo ? ' · Holo' : ''}${op.isNew[op.i] ? ' · NEW' : ''}`;
@@ -261,6 +264,7 @@ function reveal(): void {
 function next(): void {
   const op = OP;
   if (!op || op.mode !== 'card') return;
+  sfx('nextTick');
   if (op.step === 'drop') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; land(); return; }
   if (op.step === 'charge') { op.timers.forEach((t) => clearTimeout(t)); op.timers = []; reveal(); return; }
   if (op.i >= op.pulls.length - 1) { showSummary(); return; }
@@ -272,6 +276,8 @@ function showSummary(): void {
   const op = OP!, o = overlayEl();
   clearTimers();
   op.mode = 'sum';
+  sfx('summary');
+  if (op.shards || op.cardShards) setTimeout(() => sfx('shard'), 700);
   delete o.dataset.a;
   const news = op.isNew.filter(Boolean).length;
   const bestI = op.pulls.reduce((m, p, k) => (tierRank(p.tier) > tierRank(op.pulls[m].tier) ? k : m), 0);
@@ -335,8 +341,8 @@ export function packsAct(a: string, v: string | undefined): boolean {
     case 'rip': rip(); return true;
     case 'opnext': next(); return true;
     case 'opskip': if (OP && OP.mode === 'card') showSummary(); return true;
-    case 'opclose': document.getElementById('opening')?.remove(); clearTimers(); OP = null; stopPackMusic(); onChange(); return true;
-    case 'music': setMusic(!profile().music); if (!profile().music) stopPackMusic(); onChange(); return true;
+    case 'opclose': document.getElementById('opening')?.remove(); clearTimers(); OP = null; setMusicOverride(null); onChange(); return true;
+    case 'music': setMusic(!profile().music); if (OP) setMusicOverride(profile().music ? 'pack' : 'none'); onChange(); return true;
   }
   return false;
 }

@@ -10,6 +10,7 @@
     "sim": "tsx tools/csim.ts",
     "sim:v07": "tsx tools/sim.ts",
     "econ": "tsx tools/econ.ts",
+    "audio": "tsx tools/audio-render.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

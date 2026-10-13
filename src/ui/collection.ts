@@ -6,6 +6,7 @@ import { cardTier } from '../casual/packs';
 import { LEVEL_MAX, SHARD_BUCKS, SHARD_YIELD, levelCost, levelOf, levelUp, maxCost } from '../casual/progress';
 import { profile, save, sellShards } from './store';
 import { liteOn } from './lite';
+import { sfx } from './sfx';
 import { cardLevelInfo } from './deck';
 import { ballerCardHTML, esc, playCardHTML, sneakerCardHTML } from './views';
 
@@ -66,10 +67,11 @@ export function collectionHTML(): string {
 export function collectionAct(a: string, v: string | undefined): boolean {
   if (a === 'cmore') { shown += pageSize(); onChange(); return true; }
   if (a === 'cfilter') { filter = v as Filter; confirmSell = false; shown = 0; onChange(); return true; }
-  if (a === 'levelup') { const id = +v!; if (levelUp(profile(), id, ballerTier(id))) save(); onChange(); return true; }
+  if (a === 'levelup') { const id = +v!; if (levelUp(profile(), id, ballerTier(id))) { save(); sfx('levelUp'); } onChange(); return true; }
   if (a === 'sellshards') {
     if (!confirmSell) { confirmSell = true; onChange(); return true; }
     sellShards(profile().shards);
+    sfx('coin');
     confirmSell = false;
     onChange();
     return true;

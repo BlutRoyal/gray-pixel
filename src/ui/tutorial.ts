@@ -74,7 +74,7 @@ function arm(): void {
     const raw = seq && snap() ? seq.current(snap()!) : null;
     const st = step || raw;
     if (!st || st.kind === 'note' || !t) return false;
-    if (t.closest('#tutor, .clutch-ov, .boot, .fx-layer')) return false;
+    if (t.closest('#tutor, .clutch-ov, .boot, .fx-layer, .snd-ov, [data-a="sound"]')) return false;
     if (!step) return true; // an animation is playing: clicks are ignored by the game anyway, keep them from leaking
     const allow = st.kind === 'click' ? (st.allow ?? st.target)?.(ctx()) : '';
     return !(allow && t.closest(allow));

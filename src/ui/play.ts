@@ -19,7 +19,9 @@ import { COURT_POS, DRIVE_END, DRIVE_START, HOOP, LOB, collapseSpots, contestSpo
 import { badges, icon, mainIcon } from './icons';
 import { GAME_TAGLINE, GLITCH_LORE, MENU_LINES, TITLE_LINES, pick } from './lore';
 import { wordmarkSVG } from './wordmark';
-import { glitchSting, whistle } from './beat';
+import { getAudio, sfx } from './sfx';
+import { speakerIcon } from './sound';
+import { setTension, spikeTension } from './music';
 import { teamHue } from './avatar';
 import { ballArc, ballHop, banner, blockFx, burst, callout, centerOf, flash, freeThrow, fxPlaying, getSpeed, glitchEl, glitchSlam, handFx, play, pulse, setSpeed, skipped, swish, tip, whistleFx, type Step, type Tone, type XY } from './fx';
 import { openPending } from './packs';
@@ -292,6 +294,7 @@ function jumboHTML(): string {
     <div class="jb-mid"><span class="jb-poss">${g.poss.off === 0 ? 'YOUR BALL' : 'CPU BALL'}</span><span class="dim small">to ${TUNING.winTo} · #${g.n}</span><span class="jb-btns">
       <button class="hb${unseen ? ' dot' : ''}" data-a="log" aria-label="Play by play" title="Play by play">${icon('card')}<small>LOG</small></button>
       <button class="hb${profile().fast ? ' on' : ''}" data-a="fast" aria-pressed="${profile().fast}" title="Fast possessions: the shot animation takes about a second">${icon('clutch')}<small>FAST</small></button>
+      <button class="hb${getAudio().mute ? ' muted' : ''}" data-a="sound" aria-label="Sound settings" title="Sound settings">${speakerIcon(getAudio().mute)}<small>SOUND</small></button>
       <button class="hb" data-a="quit" aria-label="Quit game" title="Quit">${icon('miss')}<small>QUIT</small></button></span></div>
     <div class="jb-side cpu"><div><span class="jb-lab">${esc(stage ? stage.name.toUpperCase() : 'CPU')}</span><span class="jb-num" id="s1">${C.score}</span>${moBar(C.mo, 1)}</div>${heroImg(C.coach)}</div></div>`;
 }
@@ -485,11 +488,19 @@ function subsModal(): string {
     ${S.team.map((a, ci) => `<div class="subrow"><button class="sb-out" data-a="baller" data-v="0:${ci}:c" aria-label="Card of ${esc(a.name)}">${portrait(a, 'sm')}<span><b>${esc(a.name)} ${posBadge(a)}</b>${miniStats(a)}${fatBadge(a) || '<i class="fatb ok">fresh</i>'}</span></button>${S.bench.map((b, bi) => swap(a, ci, b, bi)).join('')}</div>`).join('')}
     </div></div></div>`;
 }
+/** Momentum feedback: a rising tick for each point your bar gains, a surge when it fills; the music tension follows the bars. */
+function momentumSound(g: CGame): void {
+  const mx = TUNING.moMax, a = g.sides[0].mo, b = g.sides[1].mo, was = moShown[0];
+  const late = Math.max(g.sides[0].score, g.sides[1].score) >= TUNING.winTo - 4 ? 0.15 : 0;
+  setTension(Math.min(1, 0.15 + 0.6 * Math.max(a, b) / mx + late));
+  if (was >= 0 && a > was) { if (a >= mx) setTimeout(() => sfx('moSurge'), 30); else setTimeout(() => sfx('moTick', { level: a / mx }), 30); }
+}
 function gameHTML(): string {
   const g = G!;
   const panel = UI.phase === 'result' ? resultPanel() : UI.phase === 'def' ? defPanel() : offPanel();
   const modals = (UI.subOpen ? subsModal() : '') + (UI.cardView != null ? cardPreview() : '') + (UI.card ? ballerModal() : '');
   const html = `<div class="xg"><div class="xg-hud">${jumboHTML()}</div>${courtHTML()}<div class="xg-act g-panel">${panel}</div><div class="xg-hand g-hand">${handHTML()}</div>${logHTML()}</div>${modals}`;
+  momentumSound(g);
   moShown = [g.sides[0].mo, g.sides[1].mo];
   return html;
 }
@@ -598,6 +609,7 @@ function finishTutorial(): void {
     <div class="tut-ptr">${ptr.map(([v, t, d]) => `<button class="tut-p" data-a="tutgo" data-v="${v}"><b>${t}</b><small>${d}</small></button>`).join('')}</div>
     <div class="row end">${first ? '<button class="btn go" data-a="rewardpack">Open your free pack</button>' : ''}<button class="btn ghost" data-a="menu">Menu</button>${first ? '' : '<button class="btn go" data-a="tutorial">Play it again</button>'}</div></div>`;
   document.body.appendChild(o);
+  sfx(won ? 'reward' : 'groan');
 }
 
 // ---------- flow ----------
@@ -616,6 +628,7 @@ function startGame(idx: number): void {
   setSpeed(P.fast ? 0.45 : 1);
   goPlay();
   beginPoss();
+  setTimeout(() => sfx('whistle', { v: 0.7 }), 250);
 }
 /** Keeps the selected shooter legal after a sub, a double team or a card changed who may shoot. */
 function fixShooter(g: CGame): void {
@@ -724,6 +737,7 @@ function steps(o: Outcome): Step[] {
       ballHop(h, d, 320, 8);
       glitchEl(tokEl(off, o.shooter));
       callout(TOV_WORD(o.turnover!, mine), null, bad, 'Turnover', true);
+      sfx(/foul|clock|ref/i.test(o.turnover!) ? 'turnover' : 'steal');
       blockFx(d); flash(bad);
     } });
     return S;
@@ -735,7 +749,7 @@ function steps(o: Outcome): Step[] {
   // 1. PASS
   S.push({ wait: 650, run: () => {
     trackLines();
-    if (o.passer != null && !o.iso) { ballHop(imgPt(off, o.passer), imgPt(off, o.shooter), 420); pulse(tokEl(off, o.passer)); callout('PASS', tokEl(off, o.passer), 'cool'); }
+    if (o.passer != null && !o.iso) { sfx('bounce', { power: 0.45, v: 0.8 }); ballHop(imgPt(off, o.passer), imgPt(off, o.shooter), 420); pulse(tokEl(off, o.passer)); callout('PASS', tokEl(off, o.passer), 'cool'); }
     if (o.iso) tip(centerOf(wrap), 'ISO', 'Everyone else clears out. He drives to the rim.', good);
     wrap?.classList.add('z-' + o.zone);
     trapTips();
@@ -785,11 +799,12 @@ function steps(o: Outcome): Step[] {
     const shoot = (): void => {
       const a = imgPt(off, o.shooter), h = hoopPt();
       shooter?.classList.add('shooting');
+      if (!(drive && dunks(sb))) sfx('shotRelease', { power: Math.min(1, o.p / 70) });
       callout(`${ZONE_NAME[o.zone].toUpperCase()} ${o.p}%`, shooter, 'plain', drive ? (dunks(sb) ? 'dunk' : 'layup') : o.read && rim ? 'contested' : '');
       if (o.blocked) {
         const mid: XY = { x: a.x + (h.x - a.x) * 0.3, y: a.y + (h.y - a.y) * 0.3 - 30 };
         ballArc(a, mid, 340, 24);
-        setTimeout(() => { df?.classList.add('jump'); blockFx(mid); ballArc(mid, { x: mid.x + (side > 0 ? 150 : -150), y: mid.y + 110 }, 460, 40); }, 320 * getSpeed());
+        setTimeout(() => { sfx('block'); df?.classList.add('jump'); blockFx(mid); ballArc(mid, { x: mid.x + (side > 0 ? 150 : -150), y: mid.y + 110 }, 460, 40); }, 320 * getSpeed());
       } else if (drive) {
         if (dunks(sb)) { sp?.classList.add('dunking'); ballArc(a, h, 300, 6); } else { sp?.classList.add('layup'); ballArc(a, h, 460, 34); }
       } else if (rim) {
@@ -815,6 +830,8 @@ function steps(o: Outcome): Step[] {
     if (o.made) {
       const w = rim ? (drive ? (dunks(sb) ? DUNK_WORD : LAYUP_WORD) : o.read ? TOUGH_WORD : MAKE_WORD.rim) : MAKE_WORD[o.zone];
       swish(h, good);
+      if (drive && dunks(sb)) sfx('dunk'); else if (drive) sfx('layup'); else { sfx('swish'); if (rim) setTimeout(() => sfx('backboard', { v: 0.6 }), 30); }
+      setTimeout(() => sfx('roar', { level: Math.min(1, 0.4 + (o.pts - 2) * 0.12 + (o.clutch ? 0.25 : 0) + (o.label ? 0.2 : 0)), v: mine ? 1 : 0.6 }), 140);
       callout(o.putback ? 'PUTBACK!' : o.clutch ? 'CLUTCH!' : w[ri(w.length)], null, good, `+${o.pts}`, true);
       burst(hoopEl(), good); flash(good);
       document.getElementById('hoop')?.classList.add('swish');
@@ -822,6 +839,8 @@ function steps(o: Outcome): Step[] {
     } else if (o.blocked) callout('DENIED!', null, bad, 'Block', true);
     else {
       ballArc(h, { x: h.x + (ri(2) ? 70 : -70), y: h.y + 120 }, 500, 50);
+      sfx('rim'); if (ri(2)) setTimeout(() => sfx('backboard', { v: 0.5 }), 90);
+      if (mine) setTimeout(() => sfx('groan'), 260);
       document.getElementById('hoop')?.classList.add('rattle');
       callout(o.p >= 60 ? 'RIMMED OUT!' : 'BRICK!', null, bad, '', true);
     }
@@ -833,7 +852,7 @@ function steps(o: Outcome): Step[] {
       flash('hot');
       callout('AND ONE!', null, 'hot', 'foul on the finish', true, courtPt([50, 66]));
       whistleFx({ x: d.x, y: Math.max(d.y, courtPt([50, 14]).y) + 6 });
-      whistle();
+      sfx('andOne');
       pulse(sh);
       spotEl(def, o.defender)?.classList.add('foul');
       setTimeout(() => { if (skipped()) return; freeThrow(courtPt([50, 38]), hoopPt(), good); tip(courtPt([50, 52]), 'FREE THROW', `${esc(sb.name)} gets the extra point: +1 and +1 Momentum.`, good, 1300); }, 650 * getSpeed());
@@ -845,10 +864,11 @@ function steps(o: Outcome): Step[] {
       const name = o.inhuman ? 'SYSTEM ERROR' : o.label!;
       const lore = GLITCH_LORE[o.inhuman ? 'INHUMAN' : name] || GLITCH_LORE['GLITCHED'];
       glitchSlam(lvl as 1 | 2 | 3, name, `${o.p}% shot went in`, o.inhuman ? lore.alias : '');
-      glitchSting(lvl as 1 | 2 | 3);
+      sfx(('glitch' + lvl) as 'glitch1' | 'glitch2' | 'glitch3');
+      spikeTension(3);
     } });
   }
-  if (o.fireOn) S.push({ wait: 700, run: () => { callout('ON FIRE', tokEl(off, o.shooter), 'hot', 'Hot hand', false); document.getElementById('app')?.classList.add('fire-flash'); setTimeout(() => document.getElementById('app')?.classList.remove('fire-flash'), 900); } });
+  if (o.fireOn) S.push({ wait: 700, run: () => { sfx('fireOn'); spikeTension(6); callout('ON FIRE', tokEl(off, o.shooter), 'hot', 'Hot hand', false); document.getElementById('app')?.classList.add('fire-flash'); setTimeout(() => document.getElementById('app')?.classList.remove('fire-flash'), 900); } });
   return S;
 }
 async function doResolve(bonus: number): Promise<void> {
@@ -903,6 +923,8 @@ function finish(): void {
       <button class="btn ghost" data-a="menu">Menu</button>${next && !packs ? `<button class="btn go" data-a="story" data-v="${stageIdx + 1}">Next court</button>` : ''}
       <button class="btn${packs ? '' : ' go'}" data-a="rematch">${won ? 'Play again' : 'Try again'}</button></div></div>`;
   document.body.appendChild(o);
+  sfx(won ? 'reward' : 'groan');
+  if (R.shards) setTimeout(() => sfx('shard'), 900);
 }
 const closeEnd = (): void => document.getElementById('endModal')?.remove();
 
@@ -917,6 +939,7 @@ function clutchBar(): Promise<number> {
       <div class="cl-bar"><span class="cl-zone" style="left:${(c - CLUTCH.zone / 2) * 100}%;width:${CLUTCH.zone * 100}%"></span><span class="cl-perf" style="left:${(c - CLUTCH.perfect / 2) * 100}%;width:${CLUTCH.perfect * 100}%"></span><span class="cl-needle"></span></div>
       <span class="cl-hint">Tap when the needle is in the green. Center = PERFECT.</span><b class="cl-res"></b></div>`;
     document.body.appendChild(o);
+    sfx('clutchRiser', { ms: 2400 }); spikeTension(5);
     const needle = o.querySelector<HTMLElement>('.cl-needle')!;
     const t0 = performance.now(), period = 1100;
     let x = 0, done = false, raf = 0;
@@ -930,6 +953,7 @@ function clutchBar(): Promise<number> {
       const r = o.querySelector<HTMLElement>('.cl-res')!;
       r.textContent = bonus >= CLUTCH.perf ? `PERFECT +${bonus}%` : bonus ? `CLUTCH +${bonus}%` : 'NO BONUS';
       o.classList.add(bonus >= CLUTCH.perf ? 'perfect' : bonus ? 'hit' : 'miss');
+      sfx(bonus >= CLUTCH.perf ? 'moSurge' : bonus ? 'confirm' : 'back');
       window.removeEventListener('keydown', key, true);
       setTimeout(() => { o.remove(); res(bonus); }, 700);
     };
@@ -951,7 +975,7 @@ async function cpuShoots(): Promise<void> {
   const g = G!;
   aiOffense(g, 1, stage!.skill);
   let bonus = 0;
-  if (g.poss.clutch) { bonus = clutchTap(stage!.skill.sigma); if (!reduced()) { banner('CPU CLUTCH', CLUTCH_NAME[g.sides[1].coach], 'bad'); await new Promise((r) => setTimeout(r, 900)); } }
+  if (g.poss.clutch) { bonus = clutchTap(stage!.skill.sigma); if (!reduced()) { banner('CPU CLUTCH', CLUTCH_NAME[g.sides[1].coach], 'bad'); sfx('clutchRiser', { ms: 900 }); spikeTension(4); await new Promise((r) => setTimeout(r, 900)); } }
   rerender();
   await doResolve(bonus);
 }
@@ -1041,7 +1065,7 @@ export function playAct(a: string, v: string | undefined): boolean {
       const did = UI.phase !== 'result' && doSub(g, 0, ci, bi);
       if (did) { fixShooter(g); UI.msg = ''; }
       UI.subOpen = true; rerender();
-      if (did) tutNote('sub');
+      if (did) { sfx('subSwap'); tutNote('sub'); }
       return true;
     }
     case 'bcshoot': {
@@ -1063,6 +1087,7 @@ export function playAct(a: string, v: string | undefined): boolean {
       UI.msg = '';
       if (off) fixShooter(g);
       rerender();
+      sfx(c.fx.trap ? 'trapSet' : 'cardPlay', { v: c.rarity === 'iconic' || c.rarity === 'legendary' ? 1.2 : 1 });
       if (from) flyCard(from, c);
       if (!reduced()) callout(c.name.toUpperCase(), c.fx.trap ? null : tokEl(off ? 0 : 1, off ? g.poss.shooter : 1), 'cool', c.fx.trap ? 'Trap set' : c.text.split('.')[0]);
       tutNote('card', String(i));
@@ -1073,7 +1098,7 @@ export function playAct(a: string, v: string | undefined): boolean {
     case 'next':
       if (UI.phase !== 'result') return true;
       tutNote('next');
-      if (g.over) { finish(); return true; }
+      if (g.over) { sfx('whistle'); finish(); return true; }
       nextPossession(g);
       beginPoss();
       return true;
