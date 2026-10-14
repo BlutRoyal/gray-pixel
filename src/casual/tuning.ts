@@ -2,7 +2,7 @@
 // the next game (or sim) uses it. DOM-free apart from the optional localStorage persistence (guarded: no storage in node/tests).
 export interface TuneDef { key: string; label: string; group: string; min: number; max: number; step: number; hint?: string }
 export const DEFAULTS = {
-  winTo: 15, possCap: 25, rot: 3,
+  winTo: 11, possCap: 25, rot: 3,
   baseRim: 57, baseMid: 56, baseThree: 42,
   slopeRim: 2.2, slopeMid: 2.2, slopeThree: 1.9, defSlope: 1.5,
   readRim: 0.55, readMid: 0.78, readThree: 0.5,
