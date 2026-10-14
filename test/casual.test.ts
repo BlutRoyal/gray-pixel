@@ -391,11 +391,11 @@ describe('subs', () => {
     const tired = Math.max(...S.team.map((b) => fatigueOf(b)));
     expect(tired).toBeGreaterThan(0);
   });
-  it('needs a couple of subs per game from the AI, not a dozen', () => {
+  it('needs a sub or so per game from the AI (short games to 11), not a dozen', () => {
     seedRng(31);
     let subs = 0, n = 0;
     for (let i = 0; i < 20; i++) { const G = simGame(newSide('splash', bandTeam(0.4, 0.7), cpuDeck('splash', 0.5)), newSide('bully', bandTeam(0.4, 0.7), cpuDeck('bully', 0.5)), [skill, skill]); subs += G.sides[0].stats.subs + G.sides[1].stats.subs; n += 2; }
-    expect(subs / n).toBeGreaterThan(1);
+    expect(subs / n).toBeGreaterThan(0.3);
     expect(subs / n).toBeLessThan(7);
   });
 });
