@@ -10,7 +10,8 @@ import { MUSIC_TRIMS } from './trims';
 
 export type MusicCtx = TrackName;
 export const MUSIC_CTXS: MusicCtx[] = ['title', 'game', 'pack'];
-const PATH: Partial<Record<MusicCtx, string>> = { title: 'audio/title.mp3', game: 'audio/game.mp3', pack: 'audio/pack.mp3' };
+/** Only the title screen has music for now; game and pack are muted until their files are enabled here. */
+const PATH: Partial<Record<MusicCtx, string>> = { title: 'audio/title.mp3' };
 const DB = 'ballerz_audio';
 /** The synthesized loops are not the default any more; set true to use them wherever no mp3 loads. */
 export const SYNTH_MUSIC = false;
