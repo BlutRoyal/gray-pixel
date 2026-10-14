@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUDIO_KEY, DEFAULT_AUDIO, effectiveGains, loadSettings, parseSettings, saveSettings } from '../src/ui/audioSettings';
+import { AUDIO_KEY, DEFAULT_AUDIO, SFX_ENABLED, effectiveGains, loadSettings, parseSettings, saveSettings } from '../src/ui/audioSettings';
 import { SOUNDS } from '../src/ui/sounds';
 import { TRACKS } from '../src/ui/tracks';
 
@@ -15,11 +15,11 @@ describe('audio settings persistence', () => {
   it('saves and loads master, sfx, music and mute', () => {
     const s = fake();
     expect(saveSettings({ master: 0.4, sfx: 0.7, music: 0.2, mute: true }, s)).toBe(true);
-    expect(loadSettings(s)).toEqual({ master: 0.4, sfx: 0.7, music: 0.2, mute: true });
+    expect(loadSettings(s)).toEqual({ master: 0.4, sfx: 0.7, music: 0.2, mute: true, sfxOn: false });
     expect(JSON.parse(s.dump()[AUDIO_KEY]).mute).toBe(true);
   });
   it('clamps out-of-range numbers and ignores junk', () => {
-    expect(parseSettings('{"master":7,"sfx":-2,"music":"loud","mute":"yes"}')).toEqual({ master: 1, sfx: 0, music: DEFAULT_AUDIO.music, mute: false });
+    expect(parseSettings('{"master":7,"sfx":-2,"music":"loud","mute":"yes"}')).toEqual({ master: 1, sfx: 0, music: DEFAULT_AUDIO.music, mute: false, sfxOn: false });
     expect(parseSettings('not json')).toEqual(DEFAULT_AUDIO);
     expect(parseSettings('null')).toEqual(DEFAULT_AUDIO);
     expect(parseSettings(null)).toEqual(DEFAULT_AUDIO);
@@ -42,10 +42,16 @@ describe('default volumes', () => {
     expect(DEFAULT_AUDIO.master).toBeLessThanOrEqual(0.5); expect(DEFAULT_AUDIO.sfx).toBeLessThanOrEqual(0.6); expect(DEFAULT_AUDIO.music).toBeLessThanOrEqual(0.4);
   });
   it('saved settings are kept as they are', () => {
-    expect(parseSettings('{"master":0.85,"sfx":1,"music":0.6,"mute":false}')).toEqual({ master: 0.85, sfx: 1, music: 0.6, mute: false });
+    expect(parseSettings('{"master":0.85,"sfx":1,"music":0.6,"mute":false}')).toEqual({ master: 0.85, sfx: 1, music: 0.6, mute: false, sfxOn: false });
   });
 });
 
+describe('sound effects are off by default', () => {
+  it('SFX_ENABLED is false and so is the default and any saved setting without the flag', () => {
+    expect(SFX_ENABLED).toBe(false); expect(DEFAULT_AUDIO.sfxOn).toBe(false);
+    expect(parseSettings('{"sfx":1}').sfxOn).toBe(false); expect(parseSettings('{"sfxOn":true}').sfxOn).toBe(true);
+  });
+});
 describe('sound and music tables', () => {
   it('every sound has a recipe, a class and a positive trim', () => {
     const names = Object.keys(SOUNDS);

@@ -29,7 +29,7 @@ const z3 = <T>(f: () => T): Record<Zone, T> => ({ rim: f(), mid: f(), three: f()
 const newAgg = (): Agg => ({ games: 0, poss: 0, margin: 0, shots: 0, made: 0, tov: 0, clutch: 0, subs: 0, dts: 0, traps: 0, hard: 0, isos: 0, cards: 0, mo: 0, zShots: z3(() => 0), zMade: z3(() => 0), zWin: z3(() => ({ w: 0, g: 0 })),
   labels: {}, andOne: 0, inhuman: 0, blocked: 0, maxShare: 0, topWin: { w: 0, g: 0 }, fireOn: 0, fatigued: 0, perfect: 0, capped: 0, long: 0, assist: 0, heave: 0, overclock: 0, open: 0, dtShots: 0, dtMade: 0, close: 0 });
 function tally(a: Agg, G: CGame, sides: CSide[]): void {
-  a.games++; a.poss += G.n; if (G.n >= 70) a.capped++; if (G.n >= 55) a.long++; a.margin += Math.abs(G.sides[0].score - G.sides[1].score);
+  a.games++; a.poss += G.n; if (G.n >= T.possCap) a.capped++; if (G.n >= T.possCap - 5) a.long++; a.margin += Math.abs(G.sides[0].score - G.sides[1].score);
   if (Math.abs(G.sides[0].score - G.sides[1].score) <= 3) a.close++;
   for (const h of G.hist) {
     const o = h.outcome;
@@ -60,7 +60,7 @@ function tally(a: Agg, G: CGame, sides: CSide[]): void {
 }
 function report(a: Agg, title: string): void {
   console.log(`\n== ${title}`);
-  console.log(`${a.games} games · ${f1(a.poss / a.games)} possessions = ${f1(a.poss / a.games / 2)} per team (cap hit ${pc(a.capped, a.games)}, 55+ ${pc(a.long, a.games)}) · margin ${f1(a.margin / a.games)} · close (<=3) ${pc(a.close, a.games)}`);
+  console.log(`${a.games} games · ${f1(a.poss / a.games)} possessions = ${f1(a.poss / a.games / 2)} per team (cap hit ${pc(a.capped, a.games)}, cap-5+ ${pc(a.long, a.games)}) · margin ${f1(a.margin / a.games)} · close (<=3) ${pc(a.close, a.games)}`);
   console.log(`make ${pc(a.made, a.shots)} · turnovers ${pc(a.tov, a.shots + a.tov)} of possessions · assisted ${pc(a.assist, a.shots)}`);
   console.log('zone share/make: ' + ZONES.map((z) => `${z} ${pc(a.zShots[z], a.shots)}/${pc(a.zMade[z], a.zShots[z])}`).join(' · '));
   console.log('win rate of teams whose main zone is: ' + ZONES.map((z) => `${z} ${pc(a.zWin[z].w, a.zWin[z].g)} (n=${a.zWin[z].g})`).join(' · '));

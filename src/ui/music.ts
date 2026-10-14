@@ -1,6 +1,7 @@
-// Music player: a synthesized loop per context (title, game, pack) on the shared chain from sfx.ts, with an optional mp3 per context
-// (Lab file picker kept in IndexedDB, or audio/<name>.mp3 next to index.html). Nothing starts before the first gesture; the tab being
-// hidden pauses everything; volume and mute come from the audio settings.
+// Music player: one looping mp3 per context (title, game, pack): audio/title.mp3, audio/game.mp3, audio/pack.mp3 next to index.html
+// (docs/audio/ in the repo), or a file chosen in the Lab (kept in IndexedDB). Fades in and out, nothing starts before the first gesture,
+// the tab being hidden pauses it, volume and mute come from the audio settings. A missing or broken file means silence.
+// The old synthesized loops stay in tracks.ts behind SYNTH_MUSIC (off).
 import { effectiveGains } from './audioSettings';
 import { getAudio, getChain, getCtx, onAudioChange } from './sfx';
 import { TRACKS, buildBuses, type Buses, type TrackName } from './tracks';
@@ -11,6 +12,9 @@ export type MusicCtx = TrackName;
 export const MUSIC_CTXS: MusicCtx[] = ['title', 'game', 'pack'];
 const PATH: Partial<Record<MusicCtx, string>> = { title: 'audio/title.mp3', game: 'audio/game.mp3', pack: 'audio/pack.mp3' };
 const DB = 'ballerz_audio';
+/** The synthesized loops are not the default any more; set true to use them wherever no mp3 loads. */
+export const SYNTH_MUSIC = false;
+const FADE_IN = 1.4, FADE_OUT = 0.7; // seconds
 
 let base: MusicCtx | null = null;
 let override: MusicCtx | 'none' | null = null;
@@ -35,7 +39,7 @@ function idb(): Promise<IDBDatabase> {
     } catch (e) { rej(e); }
   });
 }
-/** Lab: use this file as the music of one context (kept in this browser). Pass null to go back to the built-in loop. */
+/** Lab: use this file as the music of one context (kept in this browser). Pass null to go back to audio/<name>.mp3. */
 export async function setMusicFile(c: MusicCtx, file: File | null): Promise<void> {
   try {
     const db = await idb();
@@ -102,29 +106,39 @@ function stopPlaying(fast: boolean): void { const p = playing; playing = null; p
 function startPlaying(name: MusicCtx): void {
   const url = urls[name] || (probeFailed[name] ? '' : PATH[name] || '');
   if (url) { startFile(name, url); return; }
-  startSynth(name);
+  if (SYNTH_MUSIC) startSynth(name);
 }
 function startFile(name: MusicCtx, url: string): void {
-  let dead = false;
+  let dead = false, fade = 0, dir = 1, timer = 0;
   const a = new Audio(url);
   a.loop = true;
-  const vol = (): void => { const g = effectiveGains(getAudio()); a.volume = Math.max(0, Math.min(1, g.master * Math.sqrt(g.music) * 0.9)); };
-  vol();
+  const target = (): number => { const g = effectiveGains(getAudio()); return Math.max(0, Math.min(1, g.master * Math.sqrt(g.music) * 0.9)); };
+  const apply = (): void => { try { a.volume = Math.max(0, Math.min(1, target() * fade)); } catch { /* ignore */ } };
+  const run = (): void => {
+    if (timer) return;
+    timer = window.setInterval(() => {
+      fade = Math.max(0, Math.min(1, fade + dir * 0.05 / (dir > 0 ? FADE_IN : FADE_OUT)));
+      apply();
+      if ((dir > 0 && fade >= 1) || (dir < 0 && fade <= 0)) { window.clearInterval(timer); timer = 0; if (dir < 0) { try { a.pause(); a.removeAttribute('src'); a.load(); } catch { /* ignore */ } } }
+    }, 50);
+  };
+  apply();
   const me: Playing = {
     name, kind: 'file',
-    stop() { dead = true; document.removeEventListener('visibilitychange', onVis); a.pause(); a.removeAttribute('src'); a.load(); },
-    setVol: vol,
+    stop() { dead = true; document.removeEventListener('visibilitychange', onVis); dir = -1; run(); },
+    setVol: apply,
   };
   const fallback = (): void => {
     if (dead) return;
     if (!urls[name]) probeFailed[name] = true;
-    dead = true; document.removeEventListener('visibilitychange', onVis); try { a.pause(); } catch { /* ignore */ }
+    dead = true; document.removeEventListener('visibilitychange', onVis); window.clearInterval(timer); timer = 0; try { a.pause(); } catch { /* ignore */ }
     if (playing === me) { playing = null; sync(); }
   };
   const onVis = (): void => { if (dead) return; if (document.hidden) a.pause(); else void a.play().catch(() => {}); };
   document.addEventListener('visibilitychange', onVis);
   a.addEventListener('error', fallback);
   playing = me;
+  dir = 1; run();
   a.play().catch(fallback);
 }
 function startSynth(name: MusicCtx): void {

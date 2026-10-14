@@ -69,11 +69,11 @@ function room(cost: number, pri: number, t: number): boolean {
 }
 /** Plays one sound. A no-op before the first gesture, while muted, or when the tab is hidden. */
 export function sfx(name: SfxName, o: SfxOpts = {}, retry = true): void {
-  if (!ctx || !chain || document.hidden) return;
+  if (!settings.sfxOn || !ctx || !chain || document.hidden) return;
   // the first gesture creates the context 'suspended': start it, then play (a few ms later)
   if (ctx.state === 'suspended' && retry) { void ctx.resume().then(() => sfx(name, o, false)).catch(() => {}); return; }
   if (ctx.state !== 'running') return;
-  if (settings.mute || settings.sfx <= 0 || settings.master <= 0) return;
+  if (!settings.sfxOn || settings.mute || settings.sfx <= 0 || settings.master <= 0) return;
   const def = SOUNDS[name], t = ctx.currentTime + 0.012;
   const gap = def.pri === 0 ? 0.045 : 0.02, last = lastAt[name];
   if (last !== undefined && t - last < gap) return;

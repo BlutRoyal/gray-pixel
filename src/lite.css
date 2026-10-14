@@ -9,7 +9,7 @@ html.lite :not(.cc-img):not(.tok-img):not(.hcard):not(img) { filter: none !impor
 /* full-screen overlay layers */
 html.lite .crt, html.lite body.crt-on .crt, html.lite .bg::before, html.lite .bg::after, html.lite .boot::before,
 html.lite .court-scan, html.lite .court-wrap::after, html.lite .bg-sun, html.lite .fx-glitch .gl-wash, html.lite .gl-slices,
-html.lite .opening.rays::before, html.lite .opening.rays-iconic::after, html.lite .sheen, html.lite .card::after, html.lite .hcard::after,
+html.lite .sheen, html.lite .card::after, html.lite .hcard::after,
 html.lite .gl-layer { display: none !important; }
 html.lite .bg-grid { transform: none; opacity: .5; }
 /* cards: no tilt, no heavy shadows, no per-card holo layers */
@@ -17,9 +17,6 @@ html.lite .card { transform: none !important; will-change: auto; box-shadow: 0 2
 html.lite .card.holo::after { display: none !important; }
 html.lite .panel, html.lite .overlay { background-color: rgba(8, 10, 24, .96); }
 html.lite .tok.fire .tok-img, html.lite .pack-hit { box-shadow: none; }
-html.lite .boot-lite { opacity: .9; }
-/* the splash button exists in all modes */
-.boot-lite { position: relative; z-index: 3; margin-top: 18px; padding: 8px 14px; font: 700 11px var(--mono, monospace); letter-spacing: .12em; text-transform: uppercase; color: #cfd6e4; background: rgba(10, 14, 30, .7); border: 1px solid rgba(207, 214, 228, .35); border-radius: 6px; cursor: pointer; opacity: .65; }
 /* crash recovery card */
 .recover { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; background: rgba(3, 4, 12, .9); }
 .recover > div { max-width: 340px; width: 100%; padding: 18px; background: #0b0f22; border: 1px solid #ff4fd8; border-radius: 10px; color: #e6eaf5; font: 14px/1.4 system-ui, sans-serif; text-align: center; }

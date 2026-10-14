@@ -334,9 +334,9 @@ html.lite .foilfx { box-shadow: none; } html.lite .foilfx::after { display: none
 /* the sealed pack: HOLO glitches hard, normal Iconic flickers briefly, Epic and Legendary shake the same slight way */
 .pack-hit.tease-shake { animation: pkrumble .18s linear infinite; }
 @keyframes pkrumble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2px, 1px) rotate(-.4deg); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, -1px) rotate(.4deg); } }
-.pack-hit.tease-iconic { animation: wobble 2.4s ease-in-out infinite, pkflick 3.4s steps(1) infinite; }
+.pack-hit.tease-iconic { animation: pkflick 3.4s steps(1) infinite; }
 @keyframes pkflick { 0%, 100% { filter: none; } 31% { filter: drop-shadow(-2px 0 rgba(255,47,208,.7)) drop-shadow(2px 0 rgba(61,255,240,.7)); } 33% { filter: none; } 62% { filter: brightness(1.35); } 63% { filter: none; } }
-.pack-hit.tease-holo { animation: wobble 2.4s ease-in-out infinite, gljolt 2.6s steps(1) infinite; } /* the v1.0 look: layered RGB slices every 2.6 s */
+.pack-hit.tease-holo { animation: gljolt 2.6s steps(1) infinite; } /* the v1.0 look: layered RGB slices every 2.6 s */
 .holo-pack .op-stage { animation: none; }
 @keyframes pkstage { 0% { translate: 0 0; } 50% { translate: -3px 2px; } 100% { translate: 3px -2px; } }
 .pk-static { display: none; position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .55; background: repeating-linear-gradient(0deg, rgba(255,255,255,.09) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255,47,208,.07) 0 2px, rgba(61,255,240,.07) 2px 4px); animation: pkstat .2s steps(2) infinite; }
@@ -349,7 +349,6 @@ html.lite .pk-static { animation: none; opacity: .4; } html.lite .pk-static::bef
 html.lite .pack-hit.tease-holo { outline: 3px solid #ff4fd8; outline-offset: 4px; animation: none; } html.lite .pack-hit.tease-iconic, html.lite .pack-hit.tease-shake { animation: none; }
 html.lite .holo-pack .op-stage { animation: none; }
 .pack-hit.best-epicplus .pack-art { --glow: #ffe08a; } .pack-hit.best-holo .pack-art, .pack-hit.best-iconic .pack-art { --glow: var(--t-iconic); }
-.opening.rays-epicplus { --ray: #ffe08a; }
 .op-all { margin-top: 4px; letter-spacing: .14em; }
 .flash.small { opacity: .6; animation-duration: .5s; } .flash.t-epic { background: radial-gradient(circle, rgba(220,170,255,.8), rgba(150,80,255,.35) 40%, transparent 70%); }
 /* OPEN ALL: the stack builds on a fanned pile */
@@ -398,6 +397,6 @@ html.lite .insp-x, html.lite .insp-nav { background: #0b0f22; }
 .pk-tilt { display: block; transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .15s ease-out; }
 .pack-hit:hover .pk-tilt, .pack-hit:focus-visible .pk-tilt { transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.04); }
 .pk-tap { margin: 10px 0 2px; font: 400 clamp(18px, 5vw, 26px) var(--px, var(--display)); letter-spacing: .12em; color: #fff; text-align: center; text-shadow: -2px 0 var(--magenta), 2px 0 var(--cyan); animation: gopulse 1.1s steps(2) infinite; }
-.lite .pk-tap, .lite .pk-tilt { animation: none; transition: none; }
+.lite .pk-tap, .lite .pk-tilt { transition: none; }
 @media (prefers-reduced-motion: reduce) { .pk-tap { animation: none; } .pk-tilt { transition: none; } }
 .pile-card .cart, .pile-card .pc-art { min-height: 0; } .ic-b { font-style: normal; color: var(--amber); font-weight: 700; }

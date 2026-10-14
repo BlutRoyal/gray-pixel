@@ -48,7 +48,7 @@ describe('casual rules v2', () => {
     const run = () => { seedRng(7); const G = simGame(newSide('splash', bandTeam(0.4, 0.7), cpuDeck('splash', 0.5)), newSide('bully', bandTeam(0.4, 0.7), cpuDeck('bully', 0.5)), [skill, skill]); return G.log.join('|'); };
     expect(run()).toBe(run());
   });
-  it('finishes every coach matchup with a winner at 21', () => {
+  it('finishes every coach matchup with a winner at the win target', () => {
     seedRng(99);
     for (const a of CLS_KEYS) for (const b of CLS_KEYS) {
       const G = simGame(newSide(a, bandTeam(0.3, 0.8), cpuDeck(a, 0.6)), newSide(b, bandTeam(0.3, 0.8), cpuDeck(b, 0.6)), [skill, skill]);

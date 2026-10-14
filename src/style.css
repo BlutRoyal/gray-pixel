@@ -307,7 +307,7 @@ body.crt-on .crt { display: block; position: fixed; inset: 0; z-index: 50; point
 .opening { background: radial-gradient(ellipse at 50% 60%, rgba(18,22,60,.92), rgba(3,4,12,.96) 70%); }
 .op-stage { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 980px; }
 .op-hint { font: 700 12px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: .08em; text-align: center; margin: 0; }
-.pack-hit { cursor: pointer; background: none; border: 0; padding: 0; animation: wobble 2.4s ease-in-out infinite; }
+.pack-hit { cursor: pointer; background: none; border: 0; padding: 0; }
 @keyframes wobble { 0%, 100% { transform: rotate(-2deg) translateY(0); } 50% { transform: rotate(2deg) translateY(-8px); } }
 .pack-hit.ripping { animation: rip 1s ease-in forwards; }
 .pack-hit.ripping .pack-art { animation: glow 1s ease-in forwards; }
@@ -470,13 +470,6 @@ td.hi { color: var(--mint); font-weight: 700; } td.lo { color: var(--red); font-
 .flip:not(.flipped):not(.t-common):hover .back, .flip:not(.flipped):not(.t-common):focus-visible .back {
   border-color: var(--tc); box-shadow: inset 0 0 34px 6px color-mix(in srgb, var(--tc) 55%, transparent), 0 0 18px color-mix(in srgb, var(--tc) 40%, transparent), 0 10px 22px rgba(0,0,0,.55); }
 .flip:not(.flipped).t-iconic:hover .back { box-shadow: inset 0 0 40px 10px rgba(255,79,216,.55), inset 0 0 70px 20px rgba(25,246,255,.25), 0 0 26px rgba(255,79,216,.5); }
-/* light rays behind the pack when something big is inside */
-.opening.rays::before { content: ''; position: fixed; left: 50%; top: 45%; width: 200vmax; height: 200vmax; transform: translate(-50%, -50%); pointer-events: none;
-  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--ray) 35%, transparent) 0 6deg, transparent 6deg 18deg); animation: rays 2.2s linear forwards; opacity: 0;
-  mask-image: radial-gradient(circle, #000 0, transparent 55%); -webkit-mask-image: radial-gradient(circle, #000 0, transparent 55%); }
-.opening.rays-legendary { --ray: var(--t-legendary); } .opening.rays-iconic { --ray: var(--t-iconic); }
-.opening.rays-iconic::after { content: ''; position: fixed; inset: 0; pointer-events: none; background: var(--iconic-grad); mix-blend-mode: overlay; opacity: 0; animation: icwash 2.2s ease-in forwards; }
-@keyframes rays { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(0); } 30% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, -50%) rotate(90deg) scale(1.2); } }
 @keyframes icwash { 60% { opacity: .2; } 100% { opacity: .55; } }
 .spark.t-iconic { --tc: var(--t-iconic); background: var(--iconic-grad); }
 .flash.t-iconic { background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,79,216,.45) 35%, rgba(25,246,255,.2) 55%, transparent 75%); animation-duration: 1.1s; }
@@ -485,7 +478,7 @@ td.hi { color: var(--mint); font-weight: 700; } td.lo { color: var(--red); font-
   text-shadow: 0 0 40px var(--t-legendary), 6px 6px 0 #000; animation: walk 1.5s cubic-bezier(.2,1.5,.4,1) forwards; transform: skewX(-8deg); }
 .walkout.t-iconic b { background: var(--iconic-grad); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0; filter: drop-shadow(0 0 22px rgba(255,79,216,.8)) drop-shadow(5px 5px 0 #000); animation: walk 2.2s cubic-bezier(.2,1.5,.4,1) forwards, icshift 1.2s linear infinite; }
 @keyframes walk { 0% { opacity: 0; transform: skewX(-8deg) scale(3); } 15% { opacity: 1; transform: skewX(-8deg) scale(.92); } 25% { transform: skewX(-8deg) scale(1.04); } 80% { opacity: 1; } 100% { opacity: 0; transform: skewX(-8deg) scale(1.2); } }
-@media (prefers-reduced-motion: reduce) { .walkout, .opening.rays::before, .opening.rays-iconic::after { display: none; } .card.t-iconic::before, .pack-art.p-icon::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .walkout { display: none; } .card.t-iconic::before, .pack-art.p-icon::after { animation: none; } }
 .card.t-iconic { isolation: isolate; }
 
 /* ======================= casual game ======================= */
@@ -649,7 +642,7 @@ td.hi { color: var(--mint); font-weight: 700; } td.lo { color: var(--red); font-
  
 
 /* ---------- Iconic inside: the pack glitches before it opens ---------- */
-.pack-hit.glitch { animation: wobble 2.4s ease-in-out infinite, gljolt 2.6s steps(1) infinite; }
+.pack-hit.glitch { animation: gljolt 2.6s steps(1) infinite; }
 .gl-wrap { position: relative; display: block; }
 .gl-layer { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0; }
 .gl-layer .pack-art { width: 100%; }

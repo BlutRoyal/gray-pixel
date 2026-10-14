@@ -3,7 +3,7 @@
 import { getAudio, setAudio, sfx, unlock } from './sfx';
 
 const ID = 'sndSheet';
-const ROWS: [keyof ReturnType<typeof getAudio> & ('master' | 'sfx' | 'music'), string][] = [['master', 'Master'], ['sfx', 'Effects'], ['music', 'Music']];
+const ROWS: [keyof ReturnType<typeof getAudio> & ('master' | 'sfx' | 'music'), string][] = [['master', 'Master'], ['sfx', 'Effects volume'], ['music', 'Music']];
 
 export const soundOpen = (): boolean => !!document.getElementById(ID);
 export function speakerIcon(muted: boolean): string {
@@ -16,6 +16,9 @@ function paint(o: HTMLElement): void {
     if (inp && document.activeElement !== inp) inp.value = String(Math.round(a[k] * 100));
     if (out) out.textContent = String(Math.round(a[k] * 100));
   }
+  const fx = o.querySelector<HTMLButtonElement>('.snd-sfx');
+  if (fx) { fx.setAttribute('aria-checked', String(a.sfxOn)); fx.textContent = a.sfxOn ? 'ON' : 'OFF'; fx.classList.toggle('on', a.sfxOn); }
+  const tb = o.querySelector<HTMLElement>('.snd-test'); if (tb) tb.hidden = !a.sfxOn;
   const m = o.querySelector<HTMLButtonElement>('.snd-mute');
   if (m) { m.setAttribute('aria-pressed', String(a.mute)); m.innerHTML = `${speakerIcon(a.mute)}<span>${a.mute ? 'Muted' : 'Sound on'}</span>`; m.classList.toggle('on', a.mute); }
   document.querySelectorAll<HTMLElement>('.snd-btn').forEach((b) => { b.innerHTML = speakerIcon(a.mute); b.classList.toggle('muted', a.mute); });
@@ -30,6 +33,7 @@ export function openSound(): void {
   o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Sound settings');
   o.innerHTML = `<div class="snd-box"><div class="snd-h"><b>SOUND</b><button class="btn sm go snd-done" type="button">Done</button></div>
     ${ROWS.map(([k, t]) => `<label class="snd-row"><span>${t}</span><input type="range" min="0" max="100" step="1" data-snd="${k}" aria-label="${t} volume"><output data-for="${k}"></output></label>`).join('')}
+    <label class="snd-row"><span>Sound effects</span><button class="btn sm snd-sfx" type="button" role="switch" aria-checked="false"></button><output></output></label>
     <div class="snd-act"><button class="btn snd-mute" type="button" aria-pressed="false"></button><button class="btn snd-test" type="button">Test</button></div>
     <p class="dim small snd-note">Saved in this browser. Music pauses when the tab is hidden.</p></div>`;
   document.body.appendChild(o);
@@ -42,6 +46,7 @@ export function openSound(): void {
   o.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
     if (t === o || t.closest('.snd-done')) { closeSound(); return; }
+    if (t.closest('.snd-sfx')) { setAudio({ sfxOn: !getAudio().sfxOn }); paint(o); return; }
     if (t.closest('.snd-mute')) { setAudio({ mute: !getAudio().mute }); paint(o); return; }
     if (t.closest('.snd-test')) { sfx('cardPlay'); window.setTimeout(() => sfx('swish'), 380); window.setTimeout(() => sfx('roar', { level: 0.5 }), 520); }
   });

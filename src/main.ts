@@ -1,5 +1,6 @@
 // App shell: loads the catalog, renders the active tab and routes every [data-a] click.
-import { initLite, installRecovery, cycleLite, liteLabel, liteOn } from './ui/lite';
+import { initLite, installRecovery, toggleLite } from './ui/lite';
+import { labOpen } from './ui/gate';
 installRecovery();
 initLite();
 import './style.css';
@@ -119,7 +120,7 @@ function act(a: string, v: string | undefined): void {
     return;
   }
   if (soundAct(a)) return;
-  if (a === 'lite') { cycleLite(); const b = document.querySelector<HTMLElement>('.boot-lite'); if (b) b.textContent = `Lite mode: ${liteLabel()}`; onLite(); return; }
+  if (a === 'lite') { if (labOpen()) toggleLite(); onLite(); return; }
   if (a === 'tutgo') { document.getElementById('endModal')?.remove(); playAct('menu', undefined); act('tab', v); return; }
   if (a === 'topacks') { document.querySelector('.overlay')?.remove(); act('tab', 'packs'); return; }
   tutorialAct(a) || playAct(a, v) || packsAct(a, v) || collectionAct(a, v) || deckAct(a, v) || labAct(a, v);
@@ -158,10 +159,10 @@ function splash(): void {
   const o = document.createElement('div');
   o.className = 'boot splash';
   o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Gray Pixel');
-  o.innerHTML = `<div class="boot-in"><span class="boot-mark" role="img" aria-label="Ballerz logo">${strayHTML()}</span><span class="boot-t" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-boot')}</span><p class="boot-sub">${esc(GAME_TAGLINE)}</p><ol>${BOOT_LINES.map((l, i) => `<li style="--i:${i}">${esc(l)}</li>`).join('')}</ol><i class="boot-bar"></i><p class="boot-go"><b>${esc(SPLASH_PROMPT)}</b><i class="stray" aria-hidden="true"></i><small>${esc(SPLASH_HINT)}</small></p><button class="boot-lite" data-a="lite" type="button">Lite mode: ${esc(liteLabel())}</button><button class="boot-snd" data-a="sound" type="button" aria-label="Sound settings">${speakerIcon(getAudio().mute)} Sound</button></div>`;
+  o.innerHTML = `<div class="boot-in"><span class="boot-mark" role="img" aria-label="Ballerz logo">${strayHTML()}</span><span class="boot-t" role="img" aria-label="Gray Pixel">${wordmarkSVG('wm-boot')}</span><p class="boot-sub">${esc(GAME_TAGLINE)}</p><ol>${BOOT_LINES.map((l, i) => `<li style="--i:${i}">${esc(l)}</li>`).join('')}</ol><i class="boot-bar"></i><p class="boot-go"><b>${esc(SPLASH_PROMPT)}</b><i class="stray" aria-hidden="true"></i><small>${esc(SPLASH_HINT)}</small></p><button class="boot-snd" data-a="sound" type="button" aria-label="Sound settings">${speakerIcon(getAudio().mute)} Sound</button></div>`;
   document.body.appendChild(o);
   const go = (e: Event): void => {
-    if ((e.target as HTMLElement | null)?.closest?.('.boot-lite,.boot-snd') || soundOpen()) return;
+    if ((e.target as HTMLElement | null)?.closest?.('.boot-snd') || soundOpen()) return;
     if (e instanceof KeyboardEvent && (e.key === 'Tab' || e.metaKey || e.ctrlKey || e.altKey)) return;
     e.preventDefault();
     document.removeEventListener('keydown', go, true); o.removeEventListener('pointerdown', go);
